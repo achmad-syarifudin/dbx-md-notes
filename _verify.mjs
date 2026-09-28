@@ -279,9 +279,17 @@ checks.push(
     })()],
   ["AI 助手是右侧常驻栏（#ai-panel，不是弹窗）",
     ix.includes('id="ai-panel"') && ix.includes("data-ai=") && ap.includes("setAIPanelOpen")],
-  ["AI 栏内可直接配置 / 更新模型（保存 / 测试 / 清除）",
+  ["默认「聊天」模式，创作模式才显示分析对象与任务（#aip-create-only）",
+    ix.includes('id="aip-view-chat"') && ix.includes('id="aip-view-create"') && ix.includes('id="aip-create-only"') &&
+    ap.includes("aiIsChat") && ap.includes("setAIMode") && ap.includes("renderAIMode")],
+  ["聊天结果只带「复制」，创作结果才带四个写回操作",
+    ap.includes("AI_OPS_CHAT") && ap.includes("AI_OPS_CREATE") && ap.includes('kind: chat ? "chat" : "create"')],
+  ["AI 配置走独立弹框（聊天区里没有内嵌表单）",
+    ix.includes('id="ai-cfg-modal"') && !ix.replace(/<!--[\s\S]*?-->/g, "").includes('id="aip-cfg"') &&
     st.includes('"ai/setConfig"') && st.includes('"ai/config"') && st.includes('"ai/resetConfig"') &&
-    ap.includes("submitAIConfig") && ap.includes("testAIConfig") && ap.includes("clearLocalAIConfig")],
+    ap.includes("openAIConfigModal") && ap.includes("submitAIConfig") && ap.includes("clearLocalAIConfig")],
+  ["弹框按钮行吸底（内容长时主按钮不会被滚出视野）",
+    /\.modal-card\s+\.modal-actions\s*\{[^}]*position:\s*sticky/.test(cs)],
   ["结果支持四种操作（插入到光标 / 替换选中 / 追加到末尾 / 复制）",
     ap.includes('{ op: "insert"') && ap.includes('{ op: "replace"') &&
     ap.includes('{ op: "append"') && ap.includes('{ op: "copy"')],

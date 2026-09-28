@@ -59,6 +59,7 @@ print("OK：没有重复的函数声明。")
 CRITICAL = ["main", "store-status", "store-text",
             "tree", "editor", "title",
             "ai-panel", "aip-scroll", "aip-log", "aip-go", "aip-target", "aip-mode-none",
+            "aip-view-chat", "aip-view-create", "ai-cfg-modal", "aic-save",
             "gutter-side", "gutter-ai"]
 missing = [c for c in CRITICAL if c not in live_ids]
 if missing:

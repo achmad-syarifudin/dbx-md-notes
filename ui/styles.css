@@ -550,6 +550,34 @@ button.danger:hover { background: var(--danger-soft); }
 }
 .modal-card h3 { margin: 0 0 12px; font-size: 15px; }
 
+/*
+ * 弹框按钮行吸在底部：弹框内容一长（比如 AI 配置有十来项），
+ * 主按钮「保存」就会被滚到看不见的地方 —— 用户得先猜着往下滚才知道要按哪里。
+ * sticky 之后按钮行始终可见，内容自己在上面滚。
+ */
+.modal-card .modal-actions {
+  position: sticky;
+  bottom: -16px;                 /* 抵消 .modal-card 的底部 padding */
+  margin: 16px -20px -16px;      /* 左右铺满 */
+  padding: 10px 20px 16px;
+  background: var(--bg-elev);
+  border-top: 1px solid var(--border-soft);
+}
+
+/* 弹框里的「高级选项」折叠块：默认收着，主流程只占必要高度 */
+.aip-adv {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+}
+.aip-adv > summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--fg-muted);
+  user-select: none;
+}
+.aip-adv > summary:hover { color: var(--fg); }
+
 .m-label { display: block; margin: 10px 0 4px; font-size: 12px; color: var(--fg-muted); }
 .m-msg { margin: 0 0 10px; font-size: 13px; color: var(--fg-muted); }
 .m-input {
@@ -665,16 +693,37 @@ button.danger:hover { background: var(--danger-soft); }
 .ai-panel .icon-btn { padding: 2px 6px; font-size: 13px; line-height: 1.4; }
 .ai-panel .icon-btn.on { background: var(--accent-soft); color: var(--accent); }
 
-/* 配置区 */
-.aip-cfg {
-  padding: 10px 12px 12px;
-  border-bottom: 1px solid var(--border-soft);
+/* 模式切换：聊天（默认）/ 创作 */
+.aip-views {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 8px 12px 0;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
   background: var(--bg-elev);
-  max-height: 44vh;              /* 只占一部分高度，别把对象/对话全顶下去（外层还会滚） */
-  overflow: auto;
 }
-.aip-cfg .m-label { margin-top: 8px; }
-.aip-cfg .m-text { min-height: 56px; }
+.aip-views button {
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.aip-views button:hover { color: var(--fg); }
+.aip-views button.active {
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 600;
+}
+
+/* 只有创作模式才显示的区域（分析对象 + 任务） */
+.aip-create-only { border-bottom: 1px solid var(--border-soft); }
+
+/* 配置弹框里复用的表单件（弹框用 .m-* 那套 + 这里的开关/两列/提示） */
 .aip-check {
   display: flex;
   align-items: flex-start;
@@ -688,13 +737,6 @@ button.danger:hover { background: var(--danger-soft); }
 .aip-check span { line-height: 1.45; }
 .aip-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .aip-2col > label { min-width: 0; }
-.aip-cfg-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 12px;
-}
-.aip-cfg-actions button { flex: 1; min-width: 92px; }
 .aip-msg {
   margin-top: 8px;
   font-size: 12px;

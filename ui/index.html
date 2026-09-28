@@ -104,86 +104,60 @@
 
     <div id="gutter-ai" class="gutter" role="separator" aria-orientation="vertical" title="拖动调整 AI 助手宽度（双击复位）"></div>
 
-    <!-- AI 助手：常驻右栏（不是弹窗）。结果只在用户点「插入/替换/追加」时才写回笔记。 -->
+    <!-- AI 助手：常驻右栏（不是弹窗）。默认「聊天」模式；「创作」模式才有分析对象与写回操作。 -->
     <aside id="ai-panel" class="ai-panel" hidden>
       <div class="aip-head">
         <span class="aip-brand">AI 助手</span>
         <span id="aip-model" class="aip-model"></span>
-        <button id="aip-cfg-toggle" class="icon-btn" title="配置 / 更新 AI 模型">&#9881;</button>
+        <button id="aip-cfg-toggle" class="icon-btn" title="AI 模型配置（弹框）">&#9881;</button>
         <button id="aip-clear-log" class="icon-btn" title="清空对话记录">&#9851;</button>
         <button id="aip-close" class="icon-btn" title="收起（Ctrl/Cmd+I）">&#10005;</button>
       </div>
 
+      <!-- 两种模式：
+           聊天（默认）—— 纯对话，只发你的消息，不带任何笔记内容；
+           创作 —— 可指定「分析对象」，结果带四个写回操作。 -->
+      <div class="aip-views" id="aip-views">
+        <button id="aip-view-chat" type="button" title="纯对话：只发你的消息，不带笔记内容">聊天</button>
+        <button id="aip-view-create" type="button" title="处理笔记：可指定分析对象，结果能写回笔记">创作</button>
+      </div>
+
       <!-- 上半区整块可滚动；底部的输入/发送区固定在栏底，绝不被内容挤出去 -->
       <div id="aip-scroll" class="aip-scroll">
-          <!-- 配置区：默认收起。改完点「保存」后长期有效（密钥默认只在本次会话内有效）。 -->
-          <div id="aip-cfg" class="aip-cfg" hidden>
-            <label class="aip-check">
-              <input id="aip-enabled" type="checkbox" />
-              <span>启用 AI 功能</span>
-            </label>
-            <label class="m-label" for="aip-provider">服务类型</label>
-            <select id="aip-provider" class="m-input">
-              <option value="openai">OpenAI 兼容（DeepSeek / 通义 / Kimi / 自建网关）</option>
-              <option value="anthropic">Anthropic（Claude）</option>
-              <option value="ollama">Ollama（本地模型，无需密钥）</option>
-            </select>
-            <label class="m-label" for="aip-baseurl">API 地址</label>
-            <input id="aip-baseurl" class="m-input" placeholder="https://api.deepseek.com/v1" autocomplete="off" />
-            <label class="m-label" for="aip-modelinput">模型名称</label>
-            <input id="aip-modelinput" class="m-input" placeholder="deepseek-chat" autocomplete="off" />
-            <label class="m-label" for="aip-key">API 密钥</label>
-            <input id="aip-key" class="m-input" type="password" placeholder="留空 = 不修改已保存的密钥" autocomplete="off" />
-            <label class="aip-check">
-              <input id="aip-remember" type="checkbox" />
-              <span>在本机记住密钥（明文存放在本机插件数据目录，非共享电脑再勾选）</span>
-            </label>
-            <label class="m-label" for="aip-sysprompt">自定义人设（可选）</label>
-            <textarea id="aip-sysprompt" class="m-text" placeholder="留空则使用内置的写作助手人设"></textarea>
-            <div class="aip-2col">
-              <label><span class="m-label">单次超时（秒）</span><input id="aip-timeout" class="m-input" type="number" min="5" max="300" /></label>
-              <label><span class="m-label">单次送入上限（字符）</span><input id="aip-maxchars" class="m-input" type="number" min="500" max="200000" /></label>
+        <!-- 只有「创作」模式才显示：分析对象 + 任务 -->
+        <div id="aip-create-only" class="aip-create-only" hidden>
+          <!-- 分析对象：显式可控，且跟着编辑器实时刷新（划选/输入都会更新） -->
+          <div class="aip-target">
+            <div class="aip-target-bar">
+              <span class="aip-target-title">分析对象</span>
+              <span class="aip-modes" id="aip-modes">
+                <button id="aip-mode-auto" type="button" title="有选中就用选中，否则用整篇笔记">自动跟随</button>
+                <button id="aip-mode-selection" type="button" title="只看编辑器里当前选中的那一段">选中内容</button>
+                <button id="aip-mode-note" type="button" title="用当前这篇笔记的全文">整篇笔记</button>
+                <button id="aip-mode-none" type="button" title="不使用笔记正文（可以直接提问或让它自由创作）">清除</button>
+              </span>
             </div>
-            <div class="aip-cfg-actions">
-              <button id="aip-test">测试连接</button>
-              <button id="aip-save" class="primary">保存</button>
-              <button id="aip-clear">清除本机配置</button>
-            </div>
-            <div id="aip-cfg-msg" class="aip-msg"></div>
+            <div id="aip-target" class="aip-target-body"></div>
           </div>
 
-        <!-- 分析对象：显式可控，且跟着编辑器实时刷新（划选/输入都会更新） -->
-        <div class="aip-target">
-          <div class="aip-target-bar">
-            <span class="aip-target-title">分析对象</span>
-            <span class="aip-modes" id="aip-modes">
-              <button id="aip-mode-auto" type="button" title="有选中就用选中，否则用整篇笔记">自动跟随</button>
-              <button id="aip-mode-selection" type="button" title="只看编辑器里当前选中的那一段">选中内容</button>
-              <button id="aip-mode-note" type="button" title="用当前这篇笔记的全文">整篇笔记</button>
-              <button id="aip-mode-none" type="button" title="不使用笔记正文（可以直接提问或让它自由创作）">清除</button>
-            </span>
-          </div>
-          <div id="aip-target" class="aip-target-body"></div>
+          <div id="aip-tabs" class="aip-tabs"></div>
         </div>
-
-        <div id="aip-tabs" class="aip-tabs"></div>
 
         <div id="aip-log" class="aip-log">
           <div class="aip-hint">
-            选一种任务后点下方按钮。<br />
-            要发给模型的内容看上方「分析对象」—— 可切换「选中内容 / 整篇笔记」，点「清除」则不发送笔记正文，「提问」「续写」仍可用（纯对话 / 自由生成）。<br />
-            结果不会自动写回 —— 由你选择「插入到光标 / 替换选中 / 追加到末尾 / 复制」。
+            直接在这里和 AI 对话。<br />
+            想让 AI 处理笔记（分析 / 润色 / 续写）或把结果写回笔记，切到上方「创作」。<br />
+            模型参数点右上角的 ⚙ 配置。
           </div>
         </div>
-
       </div>
 
       <!-- 固定不动的底栏：不被上面的内容挤出可见区域 -->
       <div class="aip-compose">
-        <textarea id="aip-input" class="aip-input" placeholder="（可选）额外要求 / 你的问题"></textarea>
+        <textarea id="aip-input" class="aip-input" placeholder="和 AI 说点什么…"></textarea>
         <div class="aip-compose-bar">
           <span id="aip-status" class="aip-status"></span>
-          <button id="aip-go" class="primary">开始分析</button>
+          <button id="aip-go" class="primary">发送</button>
         </div>
       </div>
     </aside>
@@ -208,6 +182,50 @@
       <div class="modal-actions">
         <button id="tn-cancel">取消</button>
         <button id="tn-ok" class="primary">创建</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- AI 模型配置（弹框）：不再占用聊天区，随时点 ⚙ 打开 -->
+  <div id="ai-cfg-modal" class="modal" hidden>
+    <div class="modal-card">
+      <h3>AI 模型配置</h3>
+      <label class="aip-check">
+        <input id="aic-enabled" type="checkbox" />
+        <span>启用 AI 功能</span>
+      </label>
+      <label class="m-label" for="aic-provider">服务类型</label>
+      <select id="aic-provider" class="m-input">
+        <option value="openai">OpenAI 兼容（DeepSeek / 通义 / Kimi / 自建网关）</option>
+        <option value="anthropic">Anthropic（Claude）</option>
+        <option value="ollama">Ollama（本地模型，无需密钥）</option>
+      </select>
+      <label class="m-label" for="aic-baseurl">API 地址</label>
+      <input id="aic-baseurl" class="m-input" placeholder="https://api.deepseek.com/v1" autocomplete="off" />
+      <label class="m-label" for="aic-modelinput">模型名称</label>
+      <input id="aic-modelinput" class="m-input" placeholder="deepseek-chat" autocomplete="off" />
+      <label class="m-label" for="aic-key">API 密钥</label>
+      <input id="aic-key" class="m-input" type="password" placeholder="留空 = 不修改已保存的密钥" autocomplete="off" />
+      <label class="aip-check">
+        <input id="aic-remember" type="checkbox" />
+        <span>在本机记住密钥（明文存放在本机插件数据目录，非共享电脑再勾选）</span>
+      </label>
+      <details class="aip-adv">
+        <summary>高级选项（人设 / 超时 / 单次上限）</summary>
+        <label class="m-label" for="aic-sysprompt">自定义人设（可选）</label>
+        <textarea id="aic-sysprompt" class="m-text" placeholder="留空则使用内置的写作助手人设"></textarea>
+        <div class="aip-2col">
+          <label><span class="m-label">单次超时（秒）</span><input id="aic-timeout" class="m-input" type="number" min="5" max="300" /></label>
+          <label><span class="m-label">单次送入上限（字符）</span><input id="aic-maxchars" class="m-input" type="number" min="500" max="200000" /></label>
+        </div>
+      </details>
+      <div id="aic-msg" class="aip-msg"></div>
+      <div class="modal-actions">
+        <button id="aic-clear" title="删除本机保存的 AI 配置，回到以连接配置为准">清除本机配置</button>
+        <button id="aic-test">测试连接</button>
+        <button id="aic-cancel">取消</button>
+        <button id="aic-save" class="primary">保存</button>
       </div>
     </div>
   </div>

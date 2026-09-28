@@ -1524,6 +1524,14 @@
     { id: "ask", label: "提问", hint: "针对笔记提问；没有正文时就是纯对话", needsInput: true, go: "提问", noContext: true }
   ];
 
+  // 两个模式（默认聊天）：
+  //   聊天 —— 纯对话：只发你写的话，不带任何笔记内容；不涉及"分析对象"，也没有写回操作。
+  //   创作 —— 处理笔记：出现「分析对象」与任务标签，结果带四个写回操作。
+  var AI_VIEWS = [
+    { id: "chat", label: "聊天", hint: "纯对话：只发你的消息，不带笔记内容" },
+    { id: "create", label: "创作", hint: "处理笔记：可指定分析对象，结果能写回笔记" }
+  ];
+
   // 缺配置时给中文名，用户才知道要去填哪一项
   var AI_MISSING_LABEL = {
     enabled: "启用 AI 功能",
@@ -1536,14 +1544,21 @@
 
   var aiState = {
     open: false,
-    task: "analyze",
+    view: "chat",        // chat（默认，纯对话）| create（创作：带分析对象与写回）
+    task: "analyze",     // 仅创作模式使用
     cfg: null,
     busy: false,
     entries: [],
-    cfgPristine: true,   // 配置区是否还没被用户改过（没改过就允许用服务端值覆盖表单）
+    cfgPristine: true,   // 配置弹框还没被用户改过（没改过就允许用服务端值覆盖表单）
     targetMode: "auto",  // 分析对象来源：auto | selection | note | none
     layoutReady: false
   };
+
+  function aiIsChat() { return (aiState.view || "chat") === "chat"; }
+  function aiViewDef(id) {
+    for (var i = 0; i < AI_VIEWS.length; i++) { if (AI_VIEWS[i].id === id) { return AI_VIEWS[i]; } }
+    return AI_VIEWS[0];
+  }
 
   function aiTaskDef(id) {
     for (var i = 0; i < AI_TASKS.length; i++) {
@@ -1646,13 +1661,48 @@
 
   /**
    * 当前状态能不能发出去。
-   * 没有正文时**不再一律禁用**：「提问」「续写」退化成纯对话 / 自由生成，只要写下了问题或要求就能发。
+   * 聊天模式：写下内容就能发（纯对话，不需要对象）。
+   * 创作模式：有正文就能发；没有正文时只有 noContext 任务（提问 / 续写）能跑，且要自己写下要求。
    */
   function aiCanRun(cfg) {
     if (aiState.busy || !(cfg && cfg.ready)) { return false; }
+    if (aiIsChat()) { return !!aiInputText(); }
     if (aiTargetUsable()) { return true; }
     if (!aiTaskDef(aiState.task).noContext) { return false; }
     return !!aiInputText();
+  }
+
+  /* ---------------- 模式：聊天 / 创作 ---------------- */
+
+  /**
+   * 切换模式。聊天模式把「分析对象 + 任务」整块收起来 ——
+   * 那是创作才需要的东西，摆在纯对话栏里只会让人以为"必须先选个对象才能说话"。
+   */
+  function setAIMode(id) {
+    var def = aiViewDef(id);
+    aiState.view = def.id;
+    renderAIMode();
+    aiState.cfgPristine = true;
+    syncAIConfigForm(aiState.cfg);
+    renderAITabs();         // 任务标签只在创作模式渲染；切回来必须补画一次
+    renderAILog();          // 空态提示语也要跟着模式变
+    refreshAITargetUI();
+  }
+
+  function renderAIMode() {
+    AI_VIEWS.forEach(function (def) {
+      var b = $("aip-view-" + def.id);
+      if (!b) { return; }
+      if ((aiState.view || "chat") === def.id) { b.classList.add("active"); } else { b.classList.remove("active"); }
+    });
+    var createOnly = $("aip-create-only");
+    if (createOnly) { createOnly.hidden = aiIsChat(); }
+    var input = $("aip-input");
+    if (input) {
+      input.placeholder = aiIsChat()
+        ? "和 AI 说点什么…"
+        : "（可选）额外要求 / 你的问题";
+    }
   }
 
   /**
@@ -1660,7 +1710,7 @@
    * 预览是重点 —— 用户必须能一眼看出"到底要发什么出去"，否则就只能靠猜。
    */
   function renderAITarget() {
-    if (!aiState.open) { return; }
+    if (!aiState.open || aiIsChat()) { return; }   // 聊天模式没有分析对象
     AI_TARGET_MODES.forEach(function (def) {
       var b = $("aip-mode-" + def.id);
       if (!b) { return; }
@@ -1766,6 +1816,12 @@
   }
 
   function renderAITabs() {
+    var go = $("aip-go");
+    if (aiIsChat()) {
+      // 聊天模式：只发一句话，按钮就叫「发送」
+      if (go) { go.textContent = "发送"; }
+      return;
+    }
     var box = $("aip-tabs");
     if (!box) { return; }
     while (box.firstChild) { box.removeChild(box.firstChild); }
@@ -1779,7 +1835,6 @@
       b.onclick = function () { setAITask(def.id); };
       box.appendChild(b);
     });
-    var go = $("aip-go");
     if (go) { go.textContent = aiTaskDef(aiState.task).go; }
     var input = $("aip-input");
     if (input) {
@@ -1809,29 +1864,29 @@
   }
 
   function aiConfigMsg(text, kind) {
-    var el = $("aip-cfg-msg");
+    var el = $("aic-msg");
     if (!el) { return; }
     el.textContent = text || "";
     if (kind) { el.setAttribute("data-kind", kind); } else { el.removeAttribute("data-kind"); }
   }
 
-  /** 把服务端配置填回表单（仅在用户还没改过表单时覆盖，避免把正在输入的内容冲掉） */
+  /** 把服务端配置填回弹框表单（仅在用户还没改过表单时覆盖，避免把正在输入的内容冲掉） */
   function syncAIConfigForm(cfg) {
     if (!cfg || !aiState.cfgPristine) { return; }
     var set = function (id, v) { var e = $(id); if (e) { e.value = v; } };
     var chk = function (id, v) { var e = $(id); if (e) { e.checked = !!v; } };
-    chk("aip-enabled", cfg.enabled);
-    set("aip-provider", cfg.provider || "openai");
-    set("aip-baseurl", cfg.baseUrl || "");
-    set("aip-modelinput", cfg.model || "");
-    set("aip-sysprompt", cfg.systemPrompt || "");
-    set("aip-timeout", cfg.timeoutSecs || 60);
-    set("aip-maxchars", cfg.maxChars || 12000);
-    chk("aip-remember", cfg.rememberKey);
-    set("aip-key", "");   // 密钥从不回传，永远是空的（留空 = 不改）
+    chk("aic-enabled", cfg.enabled);
+    set("aic-provider", cfg.provider || "openai");
+    set("aic-baseurl", cfg.baseUrl || "");
+    set("aic-modelinput", cfg.model || "");
+    set("aic-sysprompt", cfg.systemPrompt || "");
+    set("aic-timeout", cfg.timeoutSecs || 60);
+    set("aic-maxchars", cfg.maxChars || 12000);
+    chk("aic-remember", cfg.rememberKey);
+    set("aic-key", "");   // 密钥从不回传，永远是空的（留空 = 不改）
   }
 
-  /** 生成按钮的可用性 = 配置就绪 + 有对象（或该任务可无对象 + 已写下要求） */
+  /** 发送按钮的可用性 = 配置就绪 +（聊天：写了内容 / 创作：有对象或该任务可无对象且写了要求） */
   function setAIReady(cfg) {
     var go = $("aip-go");
     if (!go) { return; }
@@ -1842,7 +1897,13 @@
     if (!cfg) { return "读取 AI 配置失败（侧车未响应）"; }
     if (!cfg.ready) {
       var miss = (cfg.missing || []).map(function (k) { return AI_MISSING_LABEL[k] || k; });
-      return "还缺：" + miss.join("、") + " —— 点右上角 ⚙ 填写";
+      return "还缺：" + miss.join("、") + " —— 点右上角 ⚙ 配置";
+    }
+    // 聊天模式：只发你写的话，不带任何笔记内容
+    if (aiIsChat()) {
+      var msg = aiInputText();
+      return msg ? ("就绪 · 发送你的消息（" + aiCharCount(msg) + " 字，不带笔记内容）")
+                 : "聊天模式 · 写下你想说的就能发送（不带笔记内容）";
     }
     var def = aiTaskDef(aiState.task);
     var tgt = aiTarget();
@@ -1874,42 +1935,51 @@
       renderAIModel();
       refreshAITargetUI();
       if (!quiet && cfg && !cfg.ready && aiState.cfgPristine) {
-        // 首次打开就发现没配对：直接把配置区展开，省去"为什么不能点"的困惑
-        setAICfgOpen(true);
+        // 首次打开就发现没配对：直接把配置弹框打开，省去"为什么点不动"的困惑
+        openAIConfigModal();
       }
       return cfg;
     });
   }
 
-  function setAICfgOpen(open) {
-    var box = $("aip-cfg");
+  /* ---------------- 配置弹框（不占聊天区） ---------------- */
+
+  function openAIConfigModal() {
+    var m = $("ai-cfg-modal");
+    if (!m) { return; }
+    aiState.cfgPristine = true;
+    syncAIConfigForm(aiState.cfg);
+    aiConfigMsg("", "");
+    m.hidden = false;
     var btn = $("aip-cfg-toggle");
-    if (box) { box.hidden = !open; }
-    if (btn) { if (open) { btn.classList.add("on"); } else { btn.classList.remove("on"); } }
-    if (open) { aiState.cfgPristine = true; syncAIConfigForm(aiState.cfg); }
+    if (btn) { btn.classList.add("on"); }
+    var first = $("aic-baseurl");
+    if (first) { setTimeout(function () { try { first.focus(); } catch (e) { /* ignore */ } }, 0); }
   }
 
-  function toggleAICfg() {
-    var box = $("aip-cfg");
-    setAICfgOpen(!!(box && box.hidden));
+  function closeAIConfigModal() {
+    var m = $("ai-cfg-modal");
+    if (m) { m.hidden = true; }
+    var btn = $("aip-cfg-toggle");
+    if (btn) { btn.classList.remove("on"); }
   }
 
   function collectAIConfigForm() {
     var val = function (id) { var e = $(id); return e ? String(e.value || "") : ""; };
     var on = function (id) { var e = $(id); return !!(e && e.checked); };
     var cfg = {
-      enabled: on("aip-enabled"),
-      provider: val("aip-provider") || "openai",
-      baseUrl: val("aip-baseurl").trim(),
-      model: val("aip-modelinput").trim(),
-      systemPrompt: val("aip-sysprompt"),
-      rememberKey: on("aip-remember")
+      enabled: on("aic-enabled"),
+      provider: val("aic-provider") || "openai",
+      baseUrl: val("aic-baseurl").trim(),
+      model: val("aic-modelinput").trim(),
+      systemPrompt: val("aic-sysprompt"),
+      rememberKey: on("aic-remember")
     };
-    var t = parseInt(val("aip-timeout"), 10);
+    var t = parseInt(val("aic-timeout"), 10);
     if (t > 0) { cfg.timeoutSecs = t; }
-    var m = parseInt(val("aip-maxchars"), 10);
+    var m = parseInt(val("aic-maxchars"), 10);
     if (m > 0) { cfg.maxChars = m; }
-    var key = val("aip-key");
+    var key = val("aic-key");
     if (key.trim()) { cfg.apiKey = key.trim(); }   // 留空 = 不修改
     return cfg;
   }
@@ -1929,6 +1999,8 @@
           : (view.hasKey ? "配置已保存（密钥仅在本次会话有效：未勾选「在本机记住密钥」）" : "配置已保存");
         aiConfigMsg(where, "ok");
         toast("AI 配置已保存");
+        // 存完就没什么要看的了，收起弹框（有错时留着让用户看）
+        closeAIConfigModal();
       } else {
         aiConfigMsg("参数已应用但未保存：点「保存」才会长期有效", "");
       }
@@ -1939,7 +2011,7 @@
   }
 
   function testAIConfig() {
-    var btn = $("aip-test");
+    var btn = $("aic-test");
     if (btn) { btn.disabled = true; }
     aiConfigMsg("正在测试连接（最长约一分钟）…", "");
     S.aiTest(collectAIConfigForm()).then(function (r) {
@@ -1981,20 +2053,30 @@
   function aiHintEl() {
     var d = document.createElement("div");
     d.className = "aip-hint";
-    d.appendChild(document.createTextNode("选择一种任务后点下方按钮。"));
-    d.appendChild(document.createElement("br"));
-    d.appendChild(document.createTextNode("有选中文本时只处理选中部分，否则处理整篇笔记。"));
-    d.appendChild(document.createElement("br"));
-    d.appendChild(document.createTextNode("结果不会自动写回 —— 由你选择「插入到光标 / 替换选中 / 追加到末尾 / 复制」。"));
+    // 提示语要跟着模式变：聊天模式下说"选一种任务"会让人以为还得先选点什么
+    var lines = aiIsChat()
+      ? ["直接在这里和 AI 对话（纯文字，不带任何笔记内容）。",
+         "想让 AI 处理笔记、或把结果写回笔记，切到上方「创作」。",
+         "模型参数点右上角 ⚙ 配置。"]
+      : ["选一种任务后点下方按钮；要发给模型的内容看上方「分析对象」。",
+         "「清除」则不发送笔记正文，「提问」「续写」仍可用。",
+         "结果不会自动写回 —— 由你选择「插入到光标 / 替换选中 / 追加到末尾 / 复制」。"];
+    lines.forEach(function (t, i) {
+      if (i) { d.appendChild(document.createElement("br")); }
+      d.appendChild(document.createTextNode(t));
+    });
     return d;
   }
 
-  var AI_OPS = [
+  // 创作模式：结果是要写进笔记的，四个操作都要；
+  // 聊天模式：纯对话，没有"要写回哪儿"这回事，只留「复制」。
+  var AI_OPS_CREATE = [
     { op: "insert", text: "插入到光标" },
     { op: "replace", text: "替换选中" },
     { op: "append", text: "追加到末尾" },
     { op: "copy", text: "复制" }
   ];
+  var AI_OPS_CHAT = [{ op: "copy", text: "复制" }];
 
   function aiEntryEl(en) {
     var box = document.createElement("div");
@@ -2004,11 +2086,14 @@
     head.className = "aip-entry-head";
     var task = document.createElement("span");
     task.className = "aip-entry-task";
-    task.textContent = en.taskLabel + (en.targetLabel ? "（" + en.targetLabel + "）" : "");
+    task.textContent = en.kind === "chat"
+      ? "聊天"
+      : (en.taskLabel + (en.targetLabel ? "（" + en.targetLabel + "）" : ""));
     head.appendChild(task);
     var note = document.createElement("span");
     note.className = "aip-entry-note";
-    note.textContent = en.noteName ? ("《" + en.noteName + "》") : "（不带笔记内容）";
+    note.textContent = en.kind === "chat" ? "不带笔记内容"
+      : (en.noteName ? ("《" + en.noteName + "》") : "（不带笔记内容）");
     head.appendChild(note);
     var meta = document.createElement("span");
     meta.className = "aip-entry-meta";
@@ -2039,7 +2124,8 @@
     if (!en.error && en.result) {
       var acts = document.createElement("div");
       acts.className = "aip-entry-actions";
-      AI_OPS.forEach(function (def) {
+      // 聊天条目只留「复制」；创作条目才带四个写回操作
+      (en.kind === "chat" ? AI_OPS_CHAT : AI_OPS_CREATE).forEach(function (def) {
         var b = document.createElement("button");
         b.type = "button";
         b.textContent = def.text;
@@ -2076,23 +2162,27 @@
 
   function runAITask() {
     if (aiState.busy) { return; }
-    var def = aiTaskDef(aiState.task);
-    var tgt = aiTarget();
+    var chat = aiIsChat();
+    // 聊天模式：没有任务、没有对象，就是把你说的话发出去（task 用 ask，text 为空 = 不带笔记）
+    var def = chat ? { id: "ask", label: "聊天", go: "发送", noContext: true } : aiTaskDef(aiState.task);
+    var tgt = chat ? null : aiTarget();
     var extra = aiInputText();
     var text = (tgt && !tgt.empty) ? String(tgt.text) : "";
     var hasText = !!text.trim();
 
-    if (def.id === "ask" && !extra) {
+    if (chat) {
+      if (!extra) { toast("先写点什么再发送", "warn"); return; }
+    } else if (def.id === "ask" && !extra) {
       toast(hasText ? "请先在下方写下你的问题" : "请先在下方写下你的问题（不带笔记也能问）", "warn");
       return;
-    }
-    if (!hasText) {
+    } else if (!hasText) {
       // 没有正文：只有 noContext 的任务能跑，且必须自己写下问题/要求
       if (!def.noContext) { toast(aiReadyText(aiState.cfg), "warn"); return; }
       if (!extra) { toast("请先在下方写下要写什么", "warn"); return; }
     }
 
     var entry = {
+      kind: chat ? "chat" : "create",
       task: def.id,
       taskLabel: def.label,
       noteId: (tgt && tgt.note) ? tgt.note.id : null,
@@ -2113,7 +2203,7 @@
     renderAILog();
     setAIReady(aiState.cfg);
     var go = $("aip-go");
-    if (go) { go.textContent = "生成中…"; }
+    if (go) { go.textContent = chat ? "发送中…" : "生成中…"; }
 
     var started = Date.now();
     S.aiChat(def.id, text, extra).then(function (r) {
@@ -2132,7 +2222,7 @@
       aiState.busy = false;
       renderAILog();
       var g = $("aip-go");
-      if (g) { g.textContent = aiTaskDef(aiState.task).go; }
+      if (g) { g.textContent = aiIsChat() ? "发送" : aiTaskDef(aiState.task).go; }
       refreshAITargetUI();
     });
   }
@@ -2237,23 +2327,34 @@
     if (panel) { panel.hidden = !aiState.open; }
     if (btn) { if (aiState.open) { btn.classList.add("on"); } else { btn.classList.remove("on"); } }
     if (aiState.open) {
+      renderAIMode();
       renderAITabs();
       renderAITarget();
       refreshAIConfig();
+    } else {
+      closeAIConfigModal();
     }
     S.setPrefs({ aiPanelOpen: aiState.open });
   }
 
-  /** 打开（已打开则切任务）；task 省略时沿用上次的任务 */
+  /**
+   * 打开面板。task 省略时保持当前模式（默认聊天）。
+   * 右键菜单的「AI 分析 / AI 润色 / AI 续写 / 问 AI」属于处理笔记的用法 —— 自动切到创作模式。
+   */
   function openAIPanel(task) {
-    if (task) { aiState.task = aiTaskDef(task).id; }
+    if (task) {
+      aiState.view = "create";
+      aiState.task = aiTaskDef(task).id;
+    }
     if (!aiState.open) {
       setAIPanelOpen(true);
-      return;
+    } else {
+      renderAIMode();
+      renderAITabs();
+      renderAITarget();
+      refreshAITargetUI();
     }
-    renderAITabs();
-    renderAITarget();
-    if (task) { toast("已切到「" + aiTaskDef(task).label + "」任务"); }
+    if (task) { toast("已切到「创作 · " + aiTaskDef(task).label + "」"); }
   }
 
   function toggleAIPanel() { setAIPanelOpen(!aiState.open); }
@@ -2378,12 +2479,19 @@
     // 工具栏的「AI 助手」是开/关（常驻右栏），不是弹窗；右键菜单则会带上具体任务
     click("btn-ai", toggleAIPanel);
     click("aip-close", function () { setAIPanelOpen(false); });
-    click("aip-cfg-toggle", toggleAICfg);
+    click("aip-cfg-toggle", openAIConfigModal);
     click("aip-clear-log", clearAILog);
     click("aip-go", runAITask);
-    click("aip-test", testAIConfig);
-    click("aip-save", function () { submitAIConfig(true); });
-    click("aip-clear", clearLocalAIConfig);
+    // 模式：聊天（默认）/ 创作
+    AI_VIEWS.forEach(function (def) {
+      click("aip-view-" + def.id, function () { setAIMode(def.id); });
+    });
+    // 配置弹框
+    click("aic-save", function () { submitAIConfig(true); });
+    click("aic-test", testAIConfig);
+    click("aic-clear", clearLocalAIConfig);
+    click("aic-cancel", closeAIConfigModal);
+    click("ai-cfg-modal", function (e) { if (e.target === $("ai-cfg-modal")) { closeAIConfigModal(); } });
     // 分析对象：四种来源（自动跟随 / 选中内容 / 整篇笔记 / 清除）
     AI_TARGET_MODES.forEach(function (def) {
       click("aip-mode-" + def.id, function () { setAITargetMode(def.id); });
@@ -2393,8 +2501,8 @@
     // 「没有正文」时，发送按钮的可用性取决于你写没写问题/要求 —— 输入框也要触发刷新
     on("aip-input", "oninput", refreshAITargetSoon);
     // 用户一改表单就不再让服务端值覆盖它（否则「保存失败 → 重填」时会白填一遍）
-    on("aip-cfg", "oninput", function () { aiState.cfgPristine = false; });
-    on("aip-cfg", "onchange", function () { aiState.cfgPristine = false; });
+    on("ai-cfg-modal", "oninput", function () { aiState.cfgPristine = false; });
+    on("ai-cfg-modal", "onchange", function () { aiState.cfgPristine = false; });
     // 注意：index.html 里 #btn-copy-sql 目前是注释状态，这里必须用安全绑定（optional=true），
     // 否则整个 bindEvents 会在此处中断（2026-09-21 实际事故：所有按钮点不动 + 笔记从不落盘）。
     click("btn-copy-sql", copySqlToDbx, true);
@@ -2531,6 +2639,7 @@
         closeCtxMenu();
         if (!$("modal").hidden) { closeModal(); }
         if (!$("table-modal").hidden) { closeTableModal(); }
+        if (!$("ai-cfg-modal").hidden) { closeAIConfigModal(); }
       }
     });
 

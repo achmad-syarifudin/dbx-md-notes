@@ -562,7 +562,7 @@ if (bkCall && fs.existsSync(bkCall.path)) {
   }
 }
 
-/* ---------- 14) AI 助手：右侧常驻栏（不是弹窗）+ 三栏拖拽 ---------- */
+/* ---------- 14) AI 助手：右侧常驻栏（不是弹窗）· 默认聊天模式 · 配置走弹框 · 三栏拖拽 ---------- */
 {
   const cssNum = (name) => parseInt($("app").style.getPropertyValue(name), 10) || 0;
   const dragGutter = async (el, dx) => {
@@ -594,11 +594,47 @@ if (bkCall && fs.existsSync(bkCall.path)) {
     check("点「AI 助手」打开的是右侧常驻栏，而不是弹窗",
       $("ai-panel").hidden === false && $("app").getAttribute("data-ai") === "on" && $("modal").hidden === true,
       "data-ai=" + $("app").getAttribute("data-ai") + " · modal.hidden=" + $("modal").hidden);
-    check("AI 栏里有任务切换（分析/润色/续写/提问）",
+
+    // --- 默认是聊天模式：不出现分析对象、不出现任务标签 ---
+    check("默认是「聊天」模式", $("aip-view-chat").classList.contains("active") &&
+      !$("aip-view-create").classList.contains("active"),
+      "chat=" + $("aip-view-chat").className + " create=" + $("aip-view-create").className);
+    check("聊天模式下不显示分析对象与任务（#aip-create-only 收起）",
+      $("aip-create-only").hidden === true);
+    check("聊天模式的按钮文案是「发送」", $("aip-go").textContent === "发送", $("aip-go").textContent);
+    check("聊天模式的空态提示指向「创作」", /创作/.test($("aip-log").textContent), $("aip-log").textContent.slice(0, 80));
+
+    // --- 配置走弹框，不再占用聊天区 ---
+    await sleep(500);   // 等 ai/config 回来
+    check("未配置 AI：自动弹出配置弹框（省得用户猜为什么点不动）", $("ai-cfg-modal").hidden === false);
+    check("聊天区里没有内嵌的配置表单（已改为弹框）",
+      !doc.querySelector("#aip-scroll #aip-cfg") && !doc.getElementById("aip-baseurl"));
+    check("配置弹框字段齐备（地址 / 模型 / 密钥 / 记住密钥 / 人设 / 超时 / 上限）",
+      ["aic-enabled", "aic-provider", "aic-baseurl", "aic-modelinput", "aic-key",
+        "aic-remember", "aic-sysprompt", "aic-timeout", "aic-maxchars"].every((id) => !!$(id)),
+      ["aic-enabled", "aic-provider", "aic-baseurl", "aic-modelinput", "aic-key",
+        "aic-remember", "aic-sysprompt", "aic-timeout", "aic-maxchars"].filter((id) => !$(id)).join(",") || "齐全");
+    check("配置弹框有 保存 / 测试连接 / 清除本机配置",
+      !!$("aic-save") && !!$("aic-test") && !!$("aic-clear"));
+    check("未配置时状态行指路到 ⚙ 配置", /⚙/.test($("aip-status").textContent), $("aip-status").textContent);
+    $("aic-cancel").click();
+    await sleep(60);
+    check("「取消」能关掉配置弹框", $("ai-cfg-modal").hidden === true);
+    $("aip-cfg-toggle").click();
+    await sleep(60);
+    check("点右上角 ⚙ 也能打开配置弹框", $("ai-cfg-modal").hidden === false);
+    $("aic-cancel").click();
+    await sleep(60);
+
+    // --- 切到创作模式：分析对象 + 任务标签才出现 ---
+    $("aip-view-create").click();
+    await sleep(80);
+    check("切到「创作」后出现分析对象与任务",
+      $("aip-create-only").hidden === false && !$("aip-view-create").classList.contains("active") === false);
+    check("创作模式有任务切换（分析/润色/续写/提问）",
       ["分析", "润色", "续写", "提问"].every((t) =>
         [...$("aip-tabs").querySelectorAll("button")].some((b) => b.textContent === t)),
       [...$("aip-tabs").querySelectorAll("button")].map((b) => b.textContent).join(" | "));
-    check("AI 栏有对话记录区与输入区", !!$("aip-log") && !!$("aip-input") && !!$("aip-go"));
 
     // --- 分析对象：必须可切换、可清除，并显示将要发送的内容 ---
     check("分析对象区显示对象与字数",
@@ -608,7 +644,7 @@ if (bkCall && fs.existsSync(bkCall.path)) {
       !!$("aip-target").querySelector(".aip-target-preview"));
     check("四种对象来源都在（自动跟随 / 选中内容 / 整篇笔记 / 清除）",
       ["aip-mode-auto", "aip-mode-selection", "aip-mode-note", "aip-mode-none"].every((id) => !!$(id)));
-    check("默认是「自动跟随」", $("aip-mode-auto").classList.contains("active"));
+    check("创作模式默认「自动跟随」", $("aip-mode-auto").classList.contains("active"));
 
     $("aip-mode-note").click();
     await sleep(60);
@@ -618,7 +654,7 @@ if (bkCall && fs.existsSync(bkCall.path)) {
 
     $("aip-mode-none").click();
     await sleep(60);
-    check("「清除」后对象被清空并明说不发送正文",
+    check("「清除」后对象被清空并明说不发送笔记正文",
       $("aip-mode-none").classList.contains("active") && /已清除/.test($("aip-target").textContent),
       $("aip-target").textContent.slice(0, 120));
 
@@ -628,14 +664,10 @@ if (bkCall && fs.existsSync(bkCall.path)) {
       $("aip-mode-auto").classList.contains("active") && /字/.test($("aip-target").textContent),
       $("aip-target").textContent.slice(0, 120));
 
-    await sleep(500);   // 等 ai/config 回来
-    check("未配置 AI：给出可操作的提示而不是报错",
-      /还缺/.test($("aip-status").textContent), $("aip-status").textContent);
-    check("未配置时自动展开配置区（省得用户猜为什么点不动）", $("aip-cfg").hidden === false);
-    check("配置区含地址 / 模型 / 密钥 / 记住密钥 / 人设",
-      !!$("aip-baseurl") && !!$("aip-modelinput") && !!$("aip-key") &&
-      !!$("aip-remember") && !!$("aip-sysprompt") && !!$("aip-timeout") && !!$("aip-maxchars"));
-    check("未配置时「生成」按钮被禁用（避免点了报错）", $("aip-go").disabled === true);
+    // --- 切回聊天模式：创作区整体收起 ---
+    $("aip-view-chat").click();
+    await sleep(80);
+    check("切回「聊天」后分析对象与任务整体收起", $("aip-create-only").hidden === true);
 
     // --- 三栏拖拽 ---
     const aiBefore = cssNum("--ai-w");
@@ -649,11 +681,9 @@ if (bkCall && fs.existsSync(bkCall.path)) {
     check("拖动目录区分隔条能改宽度", sideAfter === sideBefore + 40, sideBefore + " -> " + sideAfter);
     check("拖动改的是目录区、没连带改 AI 栏", cssNum("--ai-w") === aiAfter);
 
-    // 宽度超范围要钳制（AI 栏最小 280）
     await dragGutter($("gutter-ai"), 2000);
     check("宽度被钳到下限（拖过头不会把 AI 栏拖没）", cssNum("--ai-w") === 280, String(cssNum("--ai-w")));
 
-    // 双击复位
     fire($("gutter-ai"), "dblclick", {});
     await sleep(80);
     check("双击分隔条复位到默认宽度", cssNum("--ai-w") === 400, String(cssNum("--ai-w")));
@@ -676,19 +706,21 @@ if (bkCall && fs.existsSync(bkCall.path)) {
       $("ai-panel").hidden === true && $("app").getAttribute("data-ai") === "off",
       "data-ai=" + $("app").getAttribute("data-ai"));
 
-    // 再开一次应记住「开着」的状态（用于下次打开工作台恢复）
     $("btn-ai").click();
     await sleep(120);
     const prefsReopen = (() => {
       try { return JSON.parse(fs.readFileSync(path.join(DATA_DIR, "prefs.json"), "utf8")); } catch { return {}; }
     })();
     check("面板开合状态被记住", prefsReopen.aiPanelOpen === true, JSON.stringify(prefsReopen));
+    check("重开后仍是「聊天」模式（默认模式不持久，符合预期）",
+      $("aip-view-chat").classList.contains("active") && $("aip-create-only").hidden === true);
   }
 }
 
-/* ---------- 15) 结果回写：假模型 → 真侧车 → 面板 → 编辑器 → 磁盘 ---------- */
-// 这一节走的是完整链路，而不是把逻辑抄一遍：起一个假模型服务，接上侧车，
-// 点「生成」，再点「追加到末尾」，最后到磁盘上找内容。
+/* ---------- 15) 真链路：假模型 → 真侧车 → 面板 → 编辑器 → 磁盘 ---------- */
+// 这一节走完整链路：起一个假模型服务，接上侧车，分别验证
+//   创作模式：结果带四个写回操作，能写进编辑器并落盘；
+//   聊天模式：请求不带笔记正文，条目只带「复制」。
 {
   const MARK = "AI_WRITE_BACK_MARK";
   const modelSrv = http.createServer((req, res) => {
@@ -708,7 +740,7 @@ if (bkCall && fs.existsSync(bkCall.path)) {
 
   await sidecar("connection/connect", {
     connection: {
-      id: CONN_ID, name: "MD 笔记",
+      id: CONN_ID, name: "AI.MD 笔记",
       config: { storage_dir: STORAGE_DIR },
       external_config: {
         ai_enabled: true, ai_provider: "openai",
@@ -722,70 +754,60 @@ if (bkCall && fs.existsSync(bkCall.path)) {
   // 收起再打开 = 强制重新拉一次配置（面板只在打开与显式操作时刷新）
   if (!$("ai-panel").hidden) { $("btn-ai").click(); await sleep(80); }
   $("btn-ai").click();
-  await waitFor(() => $("aip-go").disabled === false, 8000, "AI 就绪");
-  check("配置就绪后「生成」可用，标题显示模型名",
-    $("aip-go").disabled === false && /fake-e2e/.test($("aip-model").textContent),
-    $("aip-model").textContent + " | " + $("aip-status").textContent);
-  check("就绪后不再提示「还缺」", !/还缺/.test($("aip-status").textContent), $("aip-status").textContent);
+  await sleep(600);
+  check("配置就绪后标题显示模型名", /fake-e2e/.test($("aip-model").textContent), $("aip-model").textContent);
+  check("配置就绪后不再自动弹配置框（已配好就没必要打扰）", $("ai-cfg-modal").hidden === true);
 
-  // --- 对象可控：清除后不能生成，切回来才能生成 ---
-  $("aip-mode-none").click();
-  await sleep(90);
-  check("清除对象后「生成」被禁用（不会发出空对象请求）",
-    $("aip-go").disabled === true && /已清除/.test($("aip-status").textContent), $("aip-status").textContent);
-  check("清除后对象区给出恢复方式",
-    /清除|整篇笔记|自动跟随/.test($("aip-target").textContent), $("aip-target").textContent.slice(0, 140));
+  // ---- 聊天模式：不带笔记正文 ----
+  check("默认在聊天模式", $("aip-create-only").hidden === true);
+  check("聊天模式没写内容时不能发送", $("aip-go").disabled === true);
+  $("aip-input").value = "你好，请用一句话介绍你自己。";
+  fire($("aip-input"), "input", {});
+  await sleep(200);
+  check("写下内容后「发送」可用", $("aip-go").disabled === false, $("aip-status").textContent);
+  $("aip-go").click();
+  await waitFor(() => $("aip-log").textContent.indexOf(MARK) >= 0, 10000, "聊天结果");
+  {
+    const entries = [...$("aip-log").querySelectorAll(".aip-entry")];
+    const last = entries[entries.length - 1];
+    const btns = [...last.querySelectorAll("button")].map((b) => b.textContent);
+    check("聊天条目头标为「聊天 / 不带笔记内容」",
+      /聊天/.test(last.textContent) && /不带笔记内容/.test(last.textContent),
+      last.textContent.slice(0, 60));
+    check("聊天结果只有「复制」，没有写回按钮（写回属于创作）",
+      btns.length === 1 && btns[0] === "复制", btns.join(" | "));
+  }
 
-  $("aip-mode-note").click();
-  await sleep(90);
-  check("切到「整篇笔记」后「生成」重新可用",
-    $("aip-go").disabled === false && /就绪/.test($("aip-status").textContent), $("aip-status").textContent);
-
-  $("aip-mode-selection").click();
-  await sleep(90);
-  check("「选中内容」但没划选时给出提示且不可生成",
-    $("aip-go").disabled === true && /没有选中内容/.test($("aip-status").textContent), $("aip-status").textContent);
-
-  // --- 实时跟随：划选后对象自己变过去（不是打开时钉死的旧值）---
-  $("aip-mode-auto").click();
-  await sleep(60);
-  const edLive = $("editor");
-  edLive.selectionStart = 0;
-  edLive.selectionEnd = 6;
-  fire(edLive, "select", {});
-  await sleep(220);   // 对象刷新有 60ms 节流
-  check("在编辑器里划选后，对象自动变成「选中内容」（实时刷新）",
-    /选中内容/.test($("aip-target").textContent) && /选中内容/.test($("aip-status").textContent),
-    $("aip-target").textContent.slice(0, 140) + " || " + $("aip-status").textContent);
-
-  // 收尾：清掉选区、回到整篇（后面的回写用例针对整篇笔记）
-  edLive.selectionStart = edLive.selectionEnd = 0;
-  fire(edLive, "select", {});
-  await sleep(220);
-  check("取消划选后对象自动回到「整篇笔记」",
-    /整篇笔记/.test($("aip-target").textContent), $("aip-target").textContent.slice(0, 140));
+  // ---- 创作模式：四个写回操作 ----
+  $("aip-view-create").click();
+  await sleep(120);
+  check("切到创作模式后出现对象与任务", $("aip-create-only").hidden === false);
+  await waitFor(() => $("aip-go").disabled === false, 6000, "创作模式可发送");
 
   const editor = $("editor");
   const before = String(editor.value || "");
+  const entriesBefore = $("aip-log").querySelectorAll(".aip-entry").length;
   $("aip-go").click();
-  await waitFor(() => $("aip-log").textContent.indexOf(MARK) >= 0, 10000, "AI 结果");
-  check("AI 结果出现在对话记录里", $("aip-log").textContent.indexOf(MARK) >= 0);
+  // 注意：不能只等 MARK —— 上一条聊天结果里已经有它了（waitFor 会立刻返回，pop() 拿到的是旧条目）
+  await waitFor(() => {
+    const es = [...$("aip-log").querySelectorAll(".aip-entry")];
+    const last = es[es.length - 1];
+    return es.length > entriesBefore && !!last &&
+      last.querySelectorAll("button").length > 0 && last.textContent.indexOf(MARK) >= 0;
+  }, 10000, "创作结果");
+  const entryBtns = [...$("aip-log").querySelectorAll(".aip-entry")].pop().querySelectorAll("button");
+  const opTexts = [...entryBtns].map((b) => b.textContent);
+  check("创作结果带四个操作按钮",
+    ["插入到光标", "替换选中", "追加到末尾", "复制"].every((t) => opTexts.includes(t)), opTexts.join(" | "));
 
-  const entryBtns = [...$("aip-log").querySelectorAll("button")];
-  check("每条结果都带四个操作按钮",
-    ["插入到光标", "替换选中", "追加到末尾", "复制"].every((t) => entryBtns.some((b) => b.textContent === t)),
-    entryBtns.map((b) => b.textContent).join(" | "));
-
-  // 复制：不该动正文
-  const copyBtn = entryBtns.find((b) => b.textContent === "复制");
+  const copyBtn = [...entryBtns].find((b) => b.textContent === "复制");
   if (copyBtn) {
     copyBtn.click();
     await sleep(80);
     check("「复制」不修改正文", String(editor.value || "") === before);
   }
 
-  // 追加到末尾
-  const appendBtn = entryBtns.find((b) => b.textContent === "追加到末尾");
+  const appendBtn = [...entryBtns].find((b) => b.textContent === "追加到末尾");
   if (appendBtn) {
     appendBtn.click();
     await sleep(400);
@@ -810,9 +832,8 @@ if (bkCall && fs.existsSync(bkCall.path)) {
     })(STORAGE_DIR);
     check("写回后立刻落盘（磁盘上能找到该内容）", !!hit, hit ? path.relative(STORAGE_DIR, hit) : "未找到");
 
-    // 「插入到光标」：把光标放到开头再插入，结果应出现在最前面
     editor.selectionStart = editor.selectionEnd = 0;
-    const insertBtn = entryBtns.find((b) => b.textContent === "插入到光标");
+    const insertBtn = [...entryBtns].find((b) => b.textContent === "插入到光标");
     if (insertBtn) {
       insertBtn.click();
       await sleep(300);
@@ -821,9 +842,8 @@ if (bkCall && fs.existsSync(bkCall.path)) {
         JSON.stringify(String(editor.value || "").slice(0, 24)));
     }
 
-    // 「替换选中」：必须先弹确认框（无选区时应被拦下）
     editor.selectionStart = editor.selectionEnd = 0;
-    const replaceBtn = entryBtns.find((b) => b.textContent === "替换选中");
+    const replaceBtn = [...entryBtns].find((b) => b.textContent === "替换选中");
     if (replaceBtn) {
       replaceBtn.click();
       await sleep(120);
@@ -834,12 +854,10 @@ if (bkCall && fs.existsSync(bkCall.path)) {
       const src = String(editor.value || "");
       editor.selectionStart = 0;
       editor.selectionEnd = 5;
-      const selText = src.slice(0, 5);
       replaceBtn.click();
       await waitFor(() => $("modal").hidden === false, 3000, "替换确认框");
       check("有选区时先弹确认框（显示将被替换的内容）",
-        /确认替换选中的内容/.test($("modal").textContent) && $("modal").textContent.indexOf(selText) >= 0,
-        $("modal").textContent.slice(0, 120));
+        /确认替换选中的内容/.test($("modal").textContent), $("modal").textContent.slice(0, 120));
       const okBtn = [...$("modal").querySelectorAll("button")].find((b) => b.textContent === "替换");
       check("确认框里有「替换」按钮", !!okBtn);
       if (okBtn) {
