@@ -1,5 +1,5 @@
 /*
- * MD 笔记 主逻辑
+ * AI.MD 笔记 主逻辑
  * 依赖（按 index.html 加载顺序）：sql-highlight.js、markdown.js、storage.js
  *
  * 本版修复：
@@ -911,7 +911,7 @@
     renderStatus();
     renderSideFoot();
     renderDiag();
-    renderAIScope();   // AI 栏顶部要显示「当前处理哪篇 / 选中多少字」，换笔记就得跟着变
+    renderAITarget();   // AI 栏顶部要显示「当前处理哪篇 / 选中多少字」，换笔记就得跟着变
   }
 
   // ---------------- 节点操作 ----------------
@@ -1475,7 +1475,7 @@
   // ---------------- 初始化示例（仅在完全没有数据时） ----------------
   function seed() {
     var welcome =
-      "# 欢迎使用 MD 笔记\n\n" +
+      "# 欢迎使用 AI.MD 笔记\n\n" +
       "这是你的第一篇笔记。左侧是目录树，右侧是编辑器与实时预览。\n\n" +
       "## 支持的语法\n\n" +
       "- 标题、列表、**加粗**、*斜体*、`行内代码`\n" +
@@ -1497,7 +1497,7 @@
       "- 大表 `COUNT(*)` 很慢，改用近似值或缓存。\n";
 
     var f = { id: uid(), type: "folder", name: "示例", parentId: null, createdAt: nowISO(), updatedAt: nowISO() };
-    var n1 = { id: uid(), type: "note", name: "欢迎使用 MD 笔记", parentId: null, content: welcome, createdAt: nowISO(), updatedAt: nowISO() };
+    var n1 = { id: uid(), type: "note", name: "欢迎使用 AI.MD 笔记", parentId: null, content: welcome, createdAt: nowISO(), updatedAt: nowISO() };
     var n2 = { id: uid(), type: "note", name: "DBX 使用心得", parentId: f.id, content: tips, createdAt: nowISO(), updatedAt: nowISO() };
     state.nodes = [f, n1, n2];
     state.expanded[f.id] = true;
@@ -1513,11 +1513,15 @@
   // 与全插件的「不静默覆盖」原则一致。
   //
   // 为什么不做成弹窗：弹窗会遮住笔记、关掉就丢历史，而 AI 结果常常要边看边改。
+  //
+  // noContext = 没有笔记正文时**仍然可用**：
+  //   「提问」退化成纯对话，「续写」退化成按你的要求自由生成（两者都要求你写下问题/要求）；
+  //   「分析」「润色」的语义就是处理一份现成文本，没有正文做不了 —— 所以它们没这个标记。
   var AI_TASKS = [
-    { id: "analyze", label: "分析", hint: "总结要点、待办与矛盾之处", needsInput: false, go: "开始分析" },
-    { id: "polish", label: "润色", hint: "保持原意与 Markdown 结构，改善表达", needsInput: true, go: "开始润色" },
-    { id: "continue", label: "续写", hint: "在末尾自然地续写下去", needsInput: true, go: "开始续写" },
-    { id: "ask", label: "提问", hint: "针对这篇笔记提问", needsInput: true, go: "提问" }
+    { id: "analyze", label: "分析", hint: "总结要点、待办与矛盾之处", needsInput: false, go: "开始分析", noContext: false },
+    { id: "polish", label: "润色", hint: "保持原意与 Markdown 结构，改善表达", needsInput: true, go: "开始润色", noContext: false },
+    { id: "continue", label: "续写", hint: "在末尾接着写；没有正文时按你的要求写", needsInput: true, go: "开始续写", noContext: true },
+    { id: "ask", label: "提问", hint: "针对笔记提问；没有正文时就是纯对话", needsInput: true, go: "提问", noContext: true }
   ];
 
   // 缺配置时给中文名，用户才知道要去填哪一项
@@ -1537,6 +1541,7 @@
     busy: false,
     entries: [],
     cfgPristine: true,   // 配置区是否还没被用户改过（没改过就允许用服务端值覆盖表单）
+    targetMode: "auto",  // 分析对象来源：auto | selection | note | none
     layoutReady: false
   };
 
@@ -1551,44 +1556,213 @@
     return (e && e.message) ? e.message : String(e || "未知错误");
   }
 
-  /** 用户当前想处理的范围：编辑器里选中的文本优先，否则整篇笔记 */
+  /* ---------------- 分析对象（显式可控 + 实时刷新） ----------------
+   *
+   * 之前的做法是"打开面板时算一次范围"，两个问题：
+   *   1) 面板一开就把范围钉住了 —— 之后在编辑器里改选、改内容，栏里显示的还是旧的，
+   *      看起来就是"对象改不了了"；
+   *   2) 没有任何方式显式指定或清除对象。
+   * 现在把对象做成显式状态，并且跟着编辑器实时刷新：
+   *   auto      —— 跟随编辑器：有选中用选中，否则整篇（默认）
+   *   selection —— 固定用选中内容（要求当前真的有选中）
+   *   note      —— 固定用整篇笔记
+   *   none      —— 已清除：不发送任何正文，生成按钮禁用
+   */
+  var AI_TARGET_MODES = [
+    { id: "auto", label: "自动跟随", hint: "有选中就用选中，否则用整篇笔记" },
+    { id: "selection", label: "选中内容", hint: "只看编辑器里当前选中的那一段" },
+    { id: "note", label: "整篇笔记", hint: "用当前这篇笔记的全文" },
+    { id: "none", label: "清除", hint: "清除分析对象（不发送任何正文）" }
+  ];
+
+  function aiTargetModeDef(id) {
+    for (var i = 0; i < AI_TARGET_MODES.length; i++) {
+      if (AI_TARGET_MODES[i].id === id) { return AI_TARGET_MODES[i]; }
+    }
+    return AI_TARGET_MODES[0];
+  }
+
+  /** 当前编辑器里的选区（没有选中则返回空串） */
+  function aiSelection(ed) {
+    if (!ed || ed.selectionStart == null || ed.selectionEnd == null) { return { text: "", start: 0, end: 0 }; }
+    if (ed.selectionEnd <= ed.selectionStart) { return { text: "", start: ed.selectionStart || 0, end: ed.selectionEnd || 0 }; }
+    return {
+      text: String(ed.value || "").slice(ed.selectionStart, ed.selectionEnd),
+      start: ed.selectionStart,
+      end: ed.selectionEnd
+    };
+  }
+
+  /**
+   * 当前要交给模型的对象。
+   * - `empty:true` 表示"没有可发送的正文"（已清除 / 未选中 / 笔记为空 / 根本没选笔记）：
+   *   调用方据此给出**不同**的提示与后续动作，别都笼统说成"没有内容"。
+   * - `noNote:true` 表示连笔记都没选（这时「提问」「续写」仍然可用）。
+   */
   function aiTarget() {
     var n = activeNote();
-    if (!n) { return null; }
+    var mode = aiState.targetMode || "auto";
     var ed = $("editor");
-    var start = 0, end = 0, sel = "";
-    if (ed && ed.selectionStart != null && ed.selectionEnd != null && ed.selectionEnd > ed.selectionStart) {
-      start = ed.selectionStart;
-      end = ed.selectionEnd;
-      sel = String(ed.value || "").slice(start, end);
+    var sel = aiSelection(ed);
+    if (!n) {
+      return { note: null, mode: mode, label: "不带笔记内容", text: "", hasSelection: false,
+        start: sel.start, end: sel.end, empty: true, noNote: true };
     }
+
+    if (mode === "none") {
+      return { note: n, mode: mode, label: "不带笔记内容", text: "", hasSelection: false,
+        start: sel.start, end: sel.end, empty: true };
+    }
+    if (mode === "selection" && !sel.text) {
+      return { note: n, mode: mode, label: "选中内容（当前没有选中）", text: "", hasSelection: false,
+        start: sel.start, end: sel.end, empty: true };
+    }
+    var useSel = (mode === "selection" || mode === "auto") && !!sel.text;
+    var text = useSel ? sel.text : String(n.content || "");
     return {
       note: n,
-      text: sel || String(n.content || ""),
-      hasSelection: !!sel,
-      start: start,
-      end: end
+      mode: mode,
+      label: useSel ? "选中内容" : "整篇笔记",
+      text: text,
+      hasSelection: useSel,
+      start: sel.start,
+      end: sel.end,
+      empty: aiCharCount(text) === 0
     };
+  }
+
+  /** 有可发送的正文（生成按钮据此启停） */
+  function aiTargetUsable() {
+    var tgt = aiTarget();
+    return !!(tgt && !tgt.empty && String(tgt.text).trim());
   }
 
   function aiCharCount(s) { return String(s == null ? "" : s).length; }
 
-  function renderAIScope() {
-    var el = $("aip-scope");
-    if (!el) { return; }
+  function aiInputText() {
+    var el = $("aip-input");
+    return el ? String(el.value || "").trim() : "";
+  }
+
+  /**
+   * 当前状态能不能发出去。
+   * 没有正文时**不再一律禁用**：「提问」「续写」退化成纯对话 / 自由生成，只要写下了问题或要求就能发。
+   */
+  function aiCanRun(cfg) {
+    if (aiState.busy || !(cfg && cfg.ready)) { return false; }
+    if (aiTargetUsable()) { return true; }
+    if (!aiTaskDef(aiState.task).noContext) { return false; }
+    return !!aiInputText();
+  }
+
+  /**
+   * 画「分析对象」区：模式按钮高亮 + 对象摘要 + 内容预览。
+   * 预览是重点 —— 用户必须能一眼看出"到底要发什么出去"，否则就只能靠猜。
+   */
+  function renderAITarget() {
     if (!aiState.open) { return; }
+    AI_TARGET_MODES.forEach(function (def) {
+      var b = $("aip-mode-" + def.id);
+      if (!b) { return; }
+      var on = (aiState.targetMode || "auto") === def.id;
+      if (on) { b.classList.add("active"); } else { b.classList.remove("active"); }
+    });
+
+    var box = $("aip-target");
+    if (!box) { return; }
+    while (box.firstChild) { box.removeChild(box.firstChild); }
+
     var tgt = aiTarget();
+    var cap = (aiState.cfg && aiState.cfg.maxChars) ? aiState.cfg.maxChars : 12000;
+
+    function line(cls, text) {
+      var d = document.createElement("div");
+      d.className = cls;
+      d.textContent = text;
+      box.appendChild(d);
+      return d;
+    }
+
     if (!tgt) {
-      el.textContent = "未选择笔记：请先在左侧点一条笔记。";
+      line("aip-target-main", "分析对象：未选择笔记。");
       return;
     }
-    var n = aiCharCount(tgt.text);
-    var cap = (aiState.cfg && aiState.cfg.maxChars) ? aiState.cfg.maxChars : 12000;
-    var scope = tgt.hasSelection ? ("选中 " + n + " 字") : ("整篇 " + n + " 字");
-    var line = "对象：《" + String(tgt.note.name || "") + "》· " + scope;
-    if (!tgt.hasSelection && n === 0) { line += "（这篇还没有内容）"; }
-    if (n > cap) { line += "· 超过单次上限 " + cap + "，会自动截断"; }
-    el.textContent = line;
+    var chars = aiCharCount(tgt.text);
+    var name = String(tgt.note ? (tgt.note.name || "") : "");
+    if (tgt.empty) {
+      var why, tip;
+      if (tgt.noNote) {
+        why = "未选择笔记";
+        tip = "在左侧点一条笔记即可带内容分析；不带笔记也能用「提问」或「续写」。";
+      } else if (tgt.mode === "none") {
+        why = "已清除（不发送笔记正文）";
+        tip = "直接点「提问」就是纯对话，「续写」会按你的要求自由生成；想带笔记就点「整篇笔记」。";
+      } else if (tgt.mode === "selection") {
+        why = "当前没有选中内容";
+        tip = "在编辑器里划选一段即可；或点「整篇笔记」；或改用「提问」不带笔记。";
+      } else {
+        why = "这篇笔记还没有内容";
+        tip = "先写点东西；或点「清除」后直接用「提问」聊。";
+      }
+      line("aip-target-main warn", "分析对象：" + why + (name ? " · 《" + name + "》" : ""));
+      line("aip-target-tip", tip);
+      return;
+    }
+    var main = "分析对象：" + tgt.label + (name ? " · 《" + name + "》" : "") + " · " + chars + " 字";
+    if (tgt.mode === "auto") { main += "（自动跟随编辑器）"; }
+    if (chars > cap) { main += " · 超过单次上限 " + cap + "，发送时会自动截断"; }
+    line("aip-target-main", main);
+
+    var preview = document.createElement("div");
+    preview.className = "aip-target-preview";
+    var head = String(tgt.text).slice(0, 160).replace(/\s+/g, " ");
+    preview.textContent = head + (chars > 160 ? " …" : "");
+    preview.title = "将要发送的内容预览（前 160 字）";
+    box.appendChild(preview);
+  }
+
+  function setAITargetMode(id) {
+    var def = aiTargetModeDef(id);
+    aiState.targetMode = def.id;
+    refreshAITargetUI();
+    if (def.id === "selection" && !aiSelection($("editor")).text) {
+      toast("还没有选中内容：在编辑器里划选一段即可", "warn");
+    }
+  }
+
+  /**
+   * 刷新「分析对象」相关的全部 UI：对象区 + 状态行 + 生成按钮。
+   * 三处必须一起刷新 —— 只刷对象区会出现「对象写的是选中内容、状态行还写着整篇笔记」这种自相矛盾
+   * （e2e 里真抓到过），用户就不知道该信哪个。
+   */
+  function refreshAITargetUI() {
+    renderAITarget();
+    var st = $("aip-status");
+    if (st) { st.textContent = aiReadyText(aiState.cfg); }
+    setAIReady(aiState.cfg);
+  }
+
+  // 编辑器里的划选/输入都要让「分析对象」实时跟着变 —— 否则又会变成"钉死的旧值"。
+  // 用 addEventListener 而不是 on("editor", ...)：编辑器已经用属性方式挂了 oninput/onblur，
+  // 属性赋值会把它整个顶掉。
+  var aiTargetTimer = null;
+  function refreshAITargetSoon() {
+    if (!aiState.open || aiTargetTimer) { return; }
+    aiTargetTimer = setTimeout(function () {
+      aiTargetTimer = null;
+      try { refreshAITargetUI(); } catch (e) { /* 纯展示，失败不影响主流程 */ }
+    }, 60);
+  }
+
+  function bindAITargetWatch() {
+    var ed = $("editor");
+    if (!ed || !ed.addEventListener) {
+      S.log("绑定编辑器事件（AI 对象跟随）", false, "编辑器不存在或不可用");
+      return;
+    }
+    ["select", "keyup", "mouseup", "focus", "input", "click"].forEach(function (ev) {
+      ed.addEventListener(ev, refreshAITargetSoon);
+    });
   }
 
   function renderAITabs() {
@@ -1618,7 +1792,7 @@
   function setAITask(id) {
     aiState.task = aiTaskDef(id).id;
     renderAITabs();
-    renderAIScope();
+    renderAITarget();
   }
 
   function renderAIModel() {
@@ -1657,23 +1831,39 @@
     set("aip-key", "");   // 密钥从不回传，永远是空的（留空 = 不改）
   }
 
+  /** 生成按钮的可用性 = 配置就绪 + 有对象（或该任务可无对象 + 已写下要求） */
   function setAIReady(cfg) {
     var go = $("aip-go");
     if (!go) { return; }
-    go.disabled = aiState.busy || !(cfg && cfg.ready);
+    go.disabled = !aiCanRun(cfg);
   }
 
   function aiReadyText(cfg) {
     if (!cfg) { return "读取 AI 配置失败（侧车未响应）"; }
-    var tgt = aiTarget();
-    var tgtText = tgt && tgt.hasSelection ? "选中内容" : "整篇笔记";
     if (!cfg.ready) {
       var miss = (cfg.missing || []).map(function (k) { return AI_MISSING_LABEL[k] || k; });
       return "还缺：" + miss.join("、") + " —— 点右上角 ⚙ 填写";
     }
-    var bits = ["本次会发送" + tgtText];
-    if (cfg.truncatedNote) { bits.push(cfg.truncatedNote); }
-    return bits.join(" · ");
+    var def = aiTaskDef(aiState.task);
+    var tgt = aiTarget();
+    if (tgt && !tgt.empty && String(tgt.text).trim()) {
+      var n = aiCharCount(tgt.text);
+      var cap = cfg.maxChars || 12000;
+      return "就绪 · 将发送" + tgt.label + "（" + n + " 字）" + (n > cap ? "，超上限会截断至 " + cap : "");
+    }
+    // 没有正文：只有「提问」「续写」能继续，且必须自己写下问题/要求
+    if (!def.noContext) {
+      var why = "当前没有可发送的正文";
+      if (tgt && tgt.noNote) { why = "还没选笔记"; }
+      else if (tgt && tgt.mode === "none") { why = "已清除分析对象"; }
+      else if (tgt && tgt.mode === "selection") { why = "没有选中内容"; }
+      else { why = "这篇笔记还没有内容"; }
+      return why + "：「" + def.label + "」需要正文。可点「整篇笔记」，或改用「提问」不带笔记直接聊。";
+    }
+    if (!aiInputText()) {
+      return "不带笔记内容 · " + (def.id === "ask" ? "在下方写下你的问题即可发送" : "在下方写下要写什么即可发送");
+    }
+    return "不带笔记内容 · 将按你的要求" + (def.id === "ask" ? "回答" : "生成");
   }
 
   /** 拉一次配置：刷新表单、标题、状态与按钮可用性 */
@@ -1682,14 +1872,11 @@
       aiState.cfg = cfg;
       syncAIConfigForm(cfg);
       renderAIModel();
-      setAIReady(cfg);
-      var st = $("aip-status");
-      if (st) { st.textContent = aiReadyText(cfg); }
+      refreshAITargetUI();
       if (!quiet && cfg && !cfg.ready && aiState.cfgPristine) {
         // 首次打开就发现没配对：直接把配置区展开，省去"为什么不能点"的困惑
         setAICfgOpen(true);
       }
-      renderAIScope();
       return cfg;
     });
   }
@@ -1735,10 +1922,7 @@
       aiState.cfgPristine = true;
       syncAIConfigForm(view);
       renderAIModel();
-      setAIReady(view);
-      var st = $("aip-status");
-      if (st) { st.textContent = aiReadyText(view); }
-      renderAIScope();
+      refreshAITargetUI();
       if (persist) {
         var where = view.keyOnDisk
           ? "配置已保存（密钥已存到本机插件数据目录）"
@@ -1774,7 +1958,7 @@
   function clearLocalAIConfig() {
     confirmListModal("清除本机保存的 AI 配置？", [
       "会删除本机插件数据目录里的 AI 配置文件（含可能保存的密钥），",
-      "之后以「MD 笔记」连接里的 AI 配置为准。",
+      "之后以「AI.MD 笔记」连接里的 AI 配置为准。",
       "笔记、连接与存储目录都不受影响。"
     ], "清除").then(function (ok) {
       if (!ok) { return; }
@@ -1783,8 +1967,7 @@
         aiState.cfgPristine = true;
         syncAIConfigForm(view);
         renderAIModel();
-        setAIReady(view);
-        renderAIScope();
+        refreshAITargetUI();
         aiConfigMsg("已清除本机配置，现在以连接配置为准", "ok");
         toast("已清除本机 AI 配置");
       }).catch(function (e) {
@@ -1821,11 +2004,11 @@
     head.className = "aip-entry-head";
     var task = document.createElement("span");
     task.className = "aip-entry-task";
-    task.textContent = en.taskLabel + (en.hasSelection ? "（选中）" : "");
+    task.textContent = en.taskLabel + (en.targetLabel ? "（" + en.targetLabel + "）" : "");
     head.appendChild(task);
     var note = document.createElement("span");
     note.className = "aip-entry-note";
-    note.textContent = "《" + en.noteName + "》";
+    note.textContent = en.noteName ? ("《" + en.noteName + "》") : "（不带笔记内容）";
     head.appendChild(note);
     var meta = document.createElement("span");
     meta.className = "aip-entry-meta";
@@ -1877,7 +2060,9 @@
       return;
     }
     aiState.entries.forEach(function (en) { log.appendChild(aiEntryEl(en)); });
-    log.scrollTop = log.scrollHeight;
+    // 滚动的容器是 #aip-scroll（上半区整体滚动，底栏固定）；拿不到就退回 log 自己
+    var sc = $("aip-scroll") || log;
+    sc.scrollTop = sc.scrollHeight;
   }
 
   function clearAILog() {
@@ -1891,22 +2076,32 @@
 
   function runAITask() {
     if (aiState.busy) { return; }
-    var tgt = aiTarget();
-    if (!tgt) { toast("请先在左侧选择一条笔记", "warn"); return; }
-    if (!String(tgt.text).trim()) { toast("这条笔记还没有内容", "warn"); return; }
     var def = aiTaskDef(aiState.task);
-    var input = $("aip-input");
-    var extra = input ? String(input.value || "").trim() : "";
-    if (def.id === "ask" && !extra) { toast("请先在下方写下你的问题", "warn"); return; }
+    var tgt = aiTarget();
+    var extra = aiInputText();
+    var text = (tgt && !tgt.empty) ? String(tgt.text) : "";
+    var hasText = !!text.trim();
+
+    if (def.id === "ask" && !extra) {
+      toast(hasText ? "请先在下方写下你的问题" : "请先在下方写下你的问题（不带笔记也能问）", "warn");
+      return;
+    }
+    if (!hasText) {
+      // 没有正文：只有 noContext 的任务能跑，且必须自己写下问题/要求
+      if (!def.noContext) { toast(aiReadyText(aiState.cfg), "warn"); return; }
+      if (!extra) { toast("请先在下方写下要写什么", "warn"); return; }
+    }
 
     var entry = {
       task: def.id,
       taskLabel: def.label,
-      noteId: tgt.note.id,
-      noteName: String(tgt.note.name || ""),
+      noteId: (tgt && tgt.note) ? tgt.note.id : null,
+      noteName: (tgt && tgt.note) ? String(tgt.note.name || "") : "",
       instruction: extra,
-      hasSelection: tgt.hasSelection,
-      scopeChars: aiCharCount(tgt.text),
+      // 「选中内容」/「整篇笔记」/「不带笔记内容」—— 记录本次实际用了什么
+      targetLabel: hasText ? tgt.label : "不带笔记内容",
+      hasSelection: hasText && !!tgt.hasSelection,
+      scopeChars: hasText ? aiCharCount(text) : 0,
       result: "",
       error: "",
       meta: "",
@@ -1921,7 +2116,7 @@
     if (go) { go.textContent = "生成中…"; }
 
     var started = Date.now();
-    S.aiChat(def.id, tgt.text, extra).then(function (r) {
+    S.aiChat(def.id, text, extra).then(function (r) {
       entry.pending = false;
       entry.result = String((r && r.content) || "");
       if (!entry.result) { entry.error = "模型返回了空内容"; }
@@ -1936,11 +2131,9 @@
     }).then(function () {
       aiState.busy = false;
       renderAILog();
-      setAIReady(aiState.cfg);
       var g = $("aip-go");
       if (g) { g.textContent = aiTaskDef(aiState.task).go; }
-      var st = $("aip-status");
-      if (st) { st.textContent = aiReadyText(aiState.cfg); }
+      refreshAITargetUI();
     });
   }
 
@@ -1956,8 +2149,9 @@
     var ed = $("editor");
     var n = activeNote();
     if (!ed || !n) { toast("请先在左侧选择一条笔记", "warn"); return; }
-    if (n.id !== en.noteId) {
+    if (en.noteId && n.id !== en.noteId) {
       // 结果来自另一篇笔记：写进去几乎一定是误操作，先问一句
+      // （noteId 为 null = 生成时就没带笔记，不存在"串笔记"的问题，直接写）
       confirmListModal("这段结果来自另一篇笔记", [
         "结果生成自：《" + en.noteName + "》",
         "当前编辑的是：《" + String(n.name || "") + "》",
@@ -2029,6 +2223,7 @@
     renderPreview();
     updateCounter();
     renderTree();
+    renderAITarget();   // 正文被 AI 结果改写了，对象预览要跟着更新
   }
 
   /* ---------------- 面板开关 ---------------- */
@@ -2043,7 +2238,7 @@
     if (btn) { if (aiState.open) { btn.classList.add("on"); } else { btn.classList.remove("on"); } }
     if (aiState.open) {
       renderAITabs();
-      renderAIScope();
+      renderAITarget();
       refreshAIConfig();
     }
     S.setPrefs({ aiPanelOpen: aiState.open });
@@ -2057,7 +2252,7 @@
       return;
     }
     renderAITabs();
-    renderAIScope();
+    renderAITarget();
     if (task) { toast("已切到「" + aiTaskDef(task).label + "」任务"); }
   }
 
@@ -2189,6 +2384,14 @@
     click("aip-test", testAIConfig);
     click("aip-save", function () { submitAIConfig(true); });
     click("aip-clear", clearLocalAIConfig);
+    // 分析对象：四种来源（自动跟随 / 选中内容 / 整篇笔记 / 清除）
+    AI_TARGET_MODES.forEach(function (def) {
+      click("aip-mode-" + def.id, function () { setAITargetMode(def.id); });
+    });
+    // 划选、输入都要让对象实时跟着变（编辑器已用属性方式挂了 oninput，所以走 addEventListener）
+    bindAITargetWatch();
+    // 「没有正文」时，发送按钮的可用性取决于你写没写问题/要求 —— 输入框也要触发刷新
+    on("aip-input", "oninput", refreshAITargetSoon);
     // 用户一改表单就不再让服务端值覆盖它（否则「保存失败 → 重填」时会白填一遍）
     on("aip-cfg", "oninput", function () { aiState.cfgPristine = false; });
     on("aip-cfg", "onchange", function () { aiState.cfgPristine = false; });

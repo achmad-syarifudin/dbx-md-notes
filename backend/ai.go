@@ -460,12 +460,43 @@ func aiConfigView() map[string]any {
 const aiDefaultSystem = "你是一位严谨的中文技术写作助手，服务于数据库工程师。回答直接、具体、不寒暄；" +
 	"不要复述原文，不要输出与请求无关的建议。"
 
-func aiTaskPrompt(task, text, instruction string) (system, user string) {
+// aiTaskLabel 给错误信息用的人话任务名（前端传的是 analyze/polish/... 这种 id）。
+func aiTaskLabel(task string) string {
 	switch task {
 	case "analyze":
+		return "分析"
+	case "polish":
+		return "润色"
+	case "continue":
+		return "续写"
+	case "ask":
+		return "提问"
+	}
+	return task
+}
+
+// aiTaskNeedsText 报告这个任务是否**必须有正文**。
+// 「分析」「润色」的语义就是处理一份现成的文本，没有正文做不了；
+// 「提问」和「续写」在没正文时仍然有意义（纯对话 / 按你的要求自由创作）。
+func aiTaskNeedsText(task string) bool {
+	return task == "analyze" || task == "polish"
+}
+
+// aiTaskPrompt 构造提示词。text 为空时**不能**再拼一段空的"笔记正文" ——
+// 那会让模型以为你给了它一份空笔记，进而不停追问或干脆胡编。
+func aiTaskPrompt(task, text, instruction string) (system, user string) {
+	has := strings.TrimSpace(text) != ""
+	switch task {
+	case "analyze":
+		if !has {
+			return aiDefaultSystem, "我这次没有提供要分析的笔记。请直接告诉我需要分析什么。"
+		}
 		return aiDefaultSystem,
 			"请分析下面这篇笔记，输出：\n1) 3–6 条要点（每条一行，用 - 开头）\n2) 其中需要跟进的事项（没有就写\"无\"）\n3) 内容里相互矛盾或与事实明显不符之处（没有就写\"无\"）\n\n笔记正文：\n\n" + text
 	case "polish":
+		if !has {
+			return aiDefaultSystem, "我这次没有提供要润色的正文。请把需要润色的内容发给我。"
+		}
 		extra := ""
 		if instruction != "" {
 			extra = "\n额外要求：" + instruction
@@ -474,6 +505,13 @@ func aiTaskPrompt(task, text, instruction string) (system, user string) {
 			"请润色下面的 Markdown 笔记：保持原意、保持 Markdown 结构与代码块不变，改善语句通顺度与用词准确度，" +
 				"不要增删事实，不要加解释。**只输出润色后的正文本身**。" + extra + "\n\n笔记正文：\n\n" + text
 	case "continue":
+		if !has {
+			dir := "请写一段 Markdown 内容"
+			if instruction != "" {
+				dir = "请按要求写一段 Markdown 内容（要求：" + instruction + "）"
+			}
+			return aiDefaultSystem, dir + "。**只输出内容本身**，不要解释、不要加前后缀。"
+		}
 		extra := ""
 		if instruction != "" {
 			extra = "（写作方向：" + instruction + "）"
@@ -485,6 +523,10 @@ func aiTaskPrompt(task, text, instruction string) (system, user string) {
 		q := instruction
 		if q == "" {
 			q = "这篇笔记讲了什么？"
+		}
+		if !has {
+			return aiDefaultSystem,
+				"回答我的问题。**我这次没有提供笔记原文**，请只依据问题本身作答，不要假装读过任何笔记。\n\n问题：" + q
 		}
 		return aiDefaultSystem,
 			"根据下面的笔记回答我的问题；笔记里没有的信息就直说没有，不要编造。\n\n问题：" + q + "\n\n笔记正文：\n\n" + text
@@ -740,7 +782,14 @@ func aiChatHandler(raw json.RawMessage) (any, *dbxpluginsdk.PluginError) {
 		return nil, badParams("invalid params: %v", e)
 	}
 	if strings.TrimSpace(req.Text) == "" {
-		return nil, badParams("缺少要处理的正文")
+		if aiTaskNeedsText(req.Task) {
+			// 「分析/润色」没有正文做不了：给出可操作的说法，别只说"缺少要处理的正文"
+			return nil, badParams("「%s」需要有正文：请选中一段内容、或把分析对象切成「整篇笔记」。"+
+				"（想不带笔记直接聊，用「提问」）", aiTaskLabel(req.Task))
+		}
+		if strings.TrimSpace(req.Instruction) == "" {
+			return nil, badParams("没有可处理的内容：请在下方写下你的问题（或要求）")
+		}
 	}
 	switch req.Task {
 	case "analyze", "polish", "continue", "ask":

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>MD 笔记</title>
+  <title>AI.MD 笔记</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body class="light">
@@ -12,7 +12,7 @@
     <aside id="sidebar">
       <div class="side-head">
         <div class="brand">
-          <span class="brand-mark">MD</span>
+          <span class="brand-mark">AI.MD</span>
           <span>笔记</span>
         </div>
         <button id="btn-theme" class="icon-btn" title="切换明暗（本地预览用）">&#9686;</button>
@@ -114,53 +114,71 @@
         <button id="aip-close" class="icon-btn" title="收起（Ctrl/Cmd+I）">&#10005;</button>
       </div>
 
-      <!-- 配置区：默认收起。改完点「保存」后长期有效（密钥默认只在本次会话内有效）。 -->
-      <div id="aip-cfg" class="aip-cfg" hidden>
-        <label class="aip-check">
-          <input id="aip-enabled" type="checkbox" />
-          <span>启用 AI 功能</span>
-        </label>
-        <label class="m-label" for="aip-provider">服务类型</label>
-        <select id="aip-provider" class="m-input">
-          <option value="openai">OpenAI 兼容（DeepSeek / 通义 / Kimi / 自建网关）</option>
-          <option value="anthropic">Anthropic（Claude）</option>
-          <option value="ollama">Ollama（本地模型，无需密钥）</option>
-        </select>
-        <label class="m-label" for="aip-baseurl">API 地址</label>
-        <input id="aip-baseurl" class="m-input" placeholder="https://api.deepseek.com/v1" autocomplete="off" />
-        <label class="m-label" for="aip-modelinput">模型名称</label>
-        <input id="aip-modelinput" class="m-input" placeholder="deepseek-chat" autocomplete="off" />
-        <label class="m-label" for="aip-key">API 密钥</label>
-        <input id="aip-key" class="m-input" type="password" placeholder="留空 = 不修改已保存的密钥" autocomplete="off" />
-        <label class="aip-check">
-          <input id="aip-remember" type="checkbox" />
-          <span>在本机记住密钥（明文存放在本机插件数据目录，非共享电脑再勾选）</span>
-        </label>
-        <label class="m-label" for="aip-sysprompt">自定义人设（可选）</label>
-        <textarea id="aip-sysprompt" class="m-text" placeholder="留空则使用内置的写作助手人设"></textarea>
-        <div class="aip-2col">
-          <label><span class="m-label">单次超时（秒）</span><input id="aip-timeout" class="m-input" type="number" min="5" max="300" /></label>
-          <label><span class="m-label">单次送入上限（字符）</span><input id="aip-maxchars" class="m-input" type="number" min="500" max="200000" /></label>
+      <!-- 上半区整块可滚动；底部的输入/发送区固定在栏底，绝不被内容挤出去 -->
+      <div id="aip-scroll" class="aip-scroll">
+          <!-- 配置区：默认收起。改完点「保存」后长期有效（密钥默认只在本次会话内有效）。 -->
+          <div id="aip-cfg" class="aip-cfg" hidden>
+            <label class="aip-check">
+              <input id="aip-enabled" type="checkbox" />
+              <span>启用 AI 功能</span>
+            </label>
+            <label class="m-label" for="aip-provider">服务类型</label>
+            <select id="aip-provider" class="m-input">
+              <option value="openai">OpenAI 兼容（DeepSeek / 通义 / Kimi / 自建网关）</option>
+              <option value="anthropic">Anthropic（Claude）</option>
+              <option value="ollama">Ollama（本地模型，无需密钥）</option>
+            </select>
+            <label class="m-label" for="aip-baseurl">API 地址</label>
+            <input id="aip-baseurl" class="m-input" placeholder="https://api.deepseek.com/v1" autocomplete="off" />
+            <label class="m-label" for="aip-modelinput">模型名称</label>
+            <input id="aip-modelinput" class="m-input" placeholder="deepseek-chat" autocomplete="off" />
+            <label class="m-label" for="aip-key">API 密钥</label>
+            <input id="aip-key" class="m-input" type="password" placeholder="留空 = 不修改已保存的密钥" autocomplete="off" />
+            <label class="aip-check">
+              <input id="aip-remember" type="checkbox" />
+              <span>在本机记住密钥（明文存放在本机插件数据目录，非共享电脑再勾选）</span>
+            </label>
+            <label class="m-label" for="aip-sysprompt">自定义人设（可选）</label>
+            <textarea id="aip-sysprompt" class="m-text" placeholder="留空则使用内置的写作助手人设"></textarea>
+            <div class="aip-2col">
+              <label><span class="m-label">单次超时（秒）</span><input id="aip-timeout" class="m-input" type="number" min="5" max="300" /></label>
+              <label><span class="m-label">单次送入上限（字符）</span><input id="aip-maxchars" class="m-input" type="number" min="500" max="200000" /></label>
+            </div>
+            <div class="aip-cfg-actions">
+              <button id="aip-test">测试连接</button>
+              <button id="aip-save" class="primary">保存</button>
+              <button id="aip-clear">清除本机配置</button>
+            </div>
+            <div id="aip-cfg-msg" class="aip-msg"></div>
+          </div>
+
+        <!-- 分析对象：显式可控，且跟着编辑器实时刷新（划选/输入都会更新） -->
+        <div class="aip-target">
+          <div class="aip-target-bar">
+            <span class="aip-target-title">分析对象</span>
+            <span class="aip-modes" id="aip-modes">
+              <button id="aip-mode-auto" type="button" title="有选中就用选中，否则用整篇笔记">自动跟随</button>
+              <button id="aip-mode-selection" type="button" title="只看编辑器里当前选中的那一段">选中内容</button>
+              <button id="aip-mode-note" type="button" title="用当前这篇笔记的全文">整篇笔记</button>
+              <button id="aip-mode-none" type="button" title="不使用笔记正文（可以直接提问或让它自由创作）">清除</button>
+            </span>
+          </div>
+          <div id="aip-target" class="aip-target-body"></div>
         </div>
-        <div class="aip-cfg-actions">
-          <button id="aip-test">测试连接</button>
-          <button id="aip-save" class="primary">保存</button>
-          <button id="aip-clear">清除本机配置</button>
+
+        <div id="aip-tabs" class="aip-tabs"></div>
+
+        <div id="aip-log" class="aip-log">
+          <div class="aip-hint">
+            选一种任务后点下方按钮。<br />
+            要发给模型的内容看上方「分析对象」—— 可切换「选中内容 / 整篇笔记」，点「清除」则不发送笔记正文，「提问」「续写」仍可用（纯对话 / 自由生成）。<br />
+            结果不会自动写回 —— 由你选择「插入到光标 / 替换选中 / 追加到末尾 / 复制」。
+          </div>
         </div>
-        <div id="aip-cfg-msg" class="aip-msg"></div>
+
       </div>
 
-      <div id="aip-scope" class="aip-scope"></div>
-      <div id="aip-tabs" class="aip-tabs"></div>
-
-      <div id="aip-log" class="aip-log">
-        <div class="aip-hint">
-          选择一种任务后点下方按钮。<br />
-          有选中文本时只处理选中部分，否则处理整篇笔记。<br />
-          结果不会自动写回 —— 由你选择「插入到光标 / 替换选中 / 追加到末尾 / 复制」。
-        </div>
-      </div>
-
+      <!-- 固定不动的底栏：不被上面的内容挤出可见区域 -->
       <div class="aip-compose">
         <textarea id="aip-input" class="aip-input" placeholder="（可选）额外要求 / 你的问题"></textarea>
         <div class="aip-compose-bar">

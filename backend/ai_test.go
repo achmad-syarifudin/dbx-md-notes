@@ -449,6 +449,58 @@ func TestPrefsWhitelistAndClamp(t *testing.T) {
 	}
 }
 
+/*
+ * 没有笔记正文时的行为（v0.8.3）：
+ *   「提问」退化成纯对话、「续写」退化成按你的要求自由生成 —— 都还能用；
+ *   「分析」「润色」的语义就是处理一份现成文本，必须拒绝，**且错误信息要给出出路**
+ *   （只说"缺少要处理的正文"，用户不知道下一步该做什么）。
+ * 另外：没有正文时**绝不能**再往提示词里拼一段空的"笔记正文" ——
+ * 那会让模型以为你给了一份空笔记。
+ */
+func TestAIChatWithoutNoteText(t *testing.T) {
+	var gotBody string
+	srv := fakeModel(t, 200, openAIJSON, nil, &gotBody)
+	resetAIConfig()
+	enableAI(t, srv.URL+"/v1", "fake-1", "openai", "sk-1234567890", nil)
+
+	// 提问 + 只有问题 → 纯对话
+	res, perr := callRaw(t, "ai/chat", map[string]any{"task": "ask", "text": "   ", "instruction": "你好"})
+	if perr != nil {
+		t.Fatalf("没有正文的「提问」应该可用（纯对话）：%s", perr.Message)
+	}
+	if res.(map[string]any)["content"] != "润色后的正文" {
+		t.Fatalf("结果应正常返回：%v", res)
+	}
+	if !strings.Contains(gotBody, "没有提供笔记原文") || !strings.Contains(gotBody, "你好") {
+		t.Fatalf("提示词应说明没有笔记上下文并带上问题：%s", gotBody)
+	}
+	if strings.Contains(gotBody, "笔记正文") {
+		t.Fatalf("没有正文时不该拼空的「笔记正文」段落：%s", gotBody)
+	}
+
+	// 续写：没要求 → 拒绝；有要求 → 自由生成
+	if _, e := callRaw(t, "ai/chat", map[string]any{"task": "continue", "text": ""}); e == nil {
+		t.Fatalf("没有正文也没有要求的「续写」应被拒")
+	}
+	if _, e := callRaw(t, "ai/chat", map[string]any{"task": "continue", "text": "", "instruction": "写一句问候"}); e != nil {
+		t.Fatalf("有要求的「续写」应该可用（自由生成）：%s", e.Message)
+	}
+	if !strings.Contains(gotBody, "写一句问候") {
+		t.Fatalf("要求没进提示词：%s", gotBody)
+	}
+
+	// 分析 / 润色：必须拒绝，并且要告诉用户怎么解决
+	for _, task := range []string{"analyze", "polish"} {
+		_, e := callRaw(t, "ai/chat", map[string]any{"task": task, "text": "   "})
+		if e == nil {
+			t.Fatalf("%s 没有正文时应被拒", task)
+		}
+		if !strings.Contains(e.Message, "整篇笔记") || !strings.Contains(e.Message, "提问") {
+			t.Fatalf("%s 的错误信息要给出路（整篇笔记 / 提问）：%s", task, e.Message)
+		}
+	}
+}
+
 // **安全底线**：密钥不得出现在数据目录或笔记目录的任何文件里。
 func TestAISecretNeverTouchesDisk(t *testing.T) {
 	const key = "sk-must-not-be-persisted-42"

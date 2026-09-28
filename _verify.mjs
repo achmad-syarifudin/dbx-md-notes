@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import zlib from "node:zlib";
-import { spawnSync } from "node:child_process";
+import { removeTree, runProcess } from "./_testutil.mjs";
 
 const ROOT = "D:/core/web/dbx-pj/dbx-md-notes";
 const srcMani = JSON.parse(fs.readFileSync(path.join(ROOT, "manifest.json"), "utf8"));
@@ -92,7 +92,7 @@ const HOST_TARGET = (() => {
   return `${osName}-${arch}`;
 })();
 
-function probePackagedSidecar() {
+async function probePackagedSidecar() {
   const out = { ok: false, detail: "", versionOk: false, version: "", probeOk: false, probeDetail: "", aiOk: false, aiDetail: "", aiSetOk: false, aiSetDetail: "", skip: false };
   if (pkgTarget && pkgTarget !== HOST_TARGET) {
     out.skip = true;
@@ -101,10 +101,13 @@ function probePackagedSidecar() {
   }
   const exeBytes = get(exeRel);
   if (!exeBytes) { out.detail = "包内没有该 executable"; return out; }
-  const base = path.join(os.tmpdir(), `dbx-verify-${process.pid}-${Date.now()}`);
-  const exePath = base + (exeRel.endsWith(".exe") ? ".exe" : "");
-  const dataDir = base + "-data";
-  const storeDir = base + "-store";
+  // 落到【项目内】的临时目录，而不是 os.tmpdir()：
+  // 本机沙箱里从系统 TEMP 直接执行新写入的 exe 会一直 EBUSY（CreateProcess 起不来），
+  // 而项目目录下的二进制（backend/*.exe、_xbuild/*）执行是正常的 —— 两个 e2e 就是这么跑的。
+  const base = path.join(ROOT, "_verify_tmp", `probe-${process.pid}`);
+  const exePath = path.join(base, path.basename(exeRel));
+  const dataDir = path.join(base, "data");
+  const storeDir = path.join(base, "store");
   try {
     fs.mkdirSync(dataDir, { recursive: true });
     fs.mkdirSync(storeDir, { recursive: true });
@@ -116,12 +119,17 @@ function probePackagedSidecar() {
       JSON.stringify({ jsonrpc: "2.0", id: "3", method: "ai/config", params: {} }),
       JSON.stringify({ jsonrpc: "2.0", id: "4", method: "ai/setConfig", params: { persist: false, model: "probe" } }),
     ].join("\n") + "\n";
-    const r = spawnSync(exePath, [], {
-      input, encoding: "utf8", timeout: 20000,
-      env: { ...process.env, DBX_PLUGIN_DATA_DIR: dataDir },
-    });
+    // 侧车**必须用异步 spawn**（见 _testutil.mjs：本机沙箱里 spawnSync 对任何 exe 都 EBUSY，
+    // 会被误判成"侧车起不来"）。刚写出来的二进制还可能被杀软短暂锁住，所以带重试。
+    const env = { ...process.env, DBX_PLUGIN_DATA_DIR: dataDir };
+    const runProbe = () => runProcess(exePath, [], { env, input, timeoutMs: 60000 });
+    let r = await runProbe();
+    for (let i = 0; i < 4 && r.error && /EBUSY|EPERM|ETXTBSY|EACCES/.test(String(r.error.code || r.error.message)); i++) {
+      await new Promise((res) => setTimeout(res, 500));
+      r = await runProbe();
+    }
     const replies = new Map();
-    String(r.stdout || "").split(/\r?\n/).forEach((line) => {
+    String(r.out || "").split(/\r?\n/).forEach((line) => {
       if (!line.trim()) return;
       try {
         const m = JSON.parse(line);
@@ -136,7 +144,10 @@ function probePackagedSidecar() {
     } else if (init && init.error) {
       out.detail = JSON.stringify(init.error).slice(0, 140);
     } else {
-      out.detail = `没有回应（exit=${r.status} stderr=${String(r.stderr || "").slice(0, 140)}）`;
+      // 把进程本身的错误也报出来：失败原因（EBUSY / 超时 / 权限）与"侧车不回话"完全是两回事，
+      // 只写 exit=null 会让人去查侧车，白费时间。
+      const why = r.error ? ("进程启动/执行失败：" + r.error.message) : "没有回应";
+      out.detail = `${why}（exit=${r.code} signal=${r.signal || "-"} stderr=${String(r.err || "").slice(0, 140)}）`;
     }
     const pb = replies.get("2");
     out.probeOk = !!pb && !pb.error && !!(pb.result && pb.result.ok);
@@ -158,13 +169,13 @@ function probePackagedSidecar() {
     out.detail = String((e && e.message) || e);
     return out;
   } finally {
-    for (const p of [exePath, dataDir, storeDir]) {
-      try { fs.rmSync(p, { recursive: true, force: true }); } catch { /* 忽略清理失败 */ }
-    }
+    // 清理：把整个探测目录删掉（base 里包含 exe/data/store 三样）。
+    // 不用 fs.rmSync：本机会被接管成"移到回收站"，慢且会抛。
+    removeTree(base);
+    removeTree(path.dirname(base));   // 顺手清掉空的 _verify_tmp
   }
 }
-const probeExe = probePackagedSidecar();
-
+const probeExe = await probePackagedSidecar();
 const checks = [
   ["manifest.version 与源码一致", mani.version === srcVer, mani.version + " vs " + srcVer],
   ["manifest.id 与源码一致（防「验的是旧 id 的包」）", mani.id === srcMani.id, mani.id + " vs " + srcMani.id],
@@ -243,12 +254,15 @@ checks.push(
     Array.isArray(mani.permissions) && !mani.permissions.includes("host.ai"), JSON.stringify(mani.permissions)],
   ["engines.dbx 未被 AI 抬高（老宿主也能装）",
     !!(mani.engines && !/>=\s*0\.6\.20/.test(String(mani.engines.dbx))), JSON.stringify(mani.engines)],
-  [".dbx-store.json 的 permissions 与 manifest 一致（商店会比对）",
+  [".dbx-store.json 的 permissions / name 与 manifest 一致（商店会比对）",
     (() => {
       try {
         const pub = JSON.parse(fs.readFileSync(path.join(ROOT, ".dbx-store.json"), "utf8"));
-        return JSON.stringify(pub.permissions) === JSON.stringify(mani.permissions);
+        return JSON.stringify(pub.permissions) === JSON.stringify(mani.permissions) && pub.name === mani.name;
       } catch { return false; }
+    })(),
+    (() => {
+      try { const pub = JSON.parse(fs.readFileSync(path.join(ROOT, ".dbx-store.json"), "utf8")); return pub.name + " / " + JSON.stringify(pub.permissions); } catch { return "(读不到)"; }
     })()],
   ["AI 配置字段齐全（含 ai_api_key 的 secret 绑定）",
     (() => {
@@ -271,6 +285,16 @@ checks.push(
   ["结果支持四种操作（插入到光标 / 替换选中 / 追加到末尾 / 复制）",
     ap.includes('{ op: "insert"') && ap.includes('{ op: "replace"') &&
     ap.includes('{ op: "append"') && ap.includes('{ op: "copy"')],
+  ["分析对象可切换 / 可清除（不是打开时钉死的旧值）",
+    ix.includes('id="aip-mode-auto"') && ix.includes('id="aip-mode-selection"') &&
+    ix.includes('id="aip-mode-note"') && ix.includes('id="aip-mode-none"') &&
+    ap.includes("setAITargetMode") && ap.includes("aiTargetUsable") && ap.includes("bindAITargetWatch")],
+  ["底栏固定、上半区可滚动（按钮不会被内容挤出视口）",
+    ix.includes('id="aip-scroll"') && cs.includes(".aip-scroll") &&
+    /\.aip-compose\s*\{[^}]*flex:\s*none/.test(cs) && /#app\s*\{[^}]*grid-template-rows/.test(cs)],
+  ["没有分析对象时「提问 / 续写」仍可发送（纯对话 / 自由生成）",
+    ap.includes("noContext") && ap.includes("aiCanRun") && ap.includes("aiInputText") &&
+    ap.includes("不带笔记内容")],
   ["三栏可拖动调整宽度（两条分隔条 + 偏好持久化）",
     ix.includes('id="gutter-side"') && ix.includes('id="gutter-ai"') &&
     ap.includes("bindGutter") && ap.includes("setPointerCapture") &&

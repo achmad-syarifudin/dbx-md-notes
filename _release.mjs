@@ -18,7 +18,7 @@
 //   dist/release-candidates.json
 import fs from "node:fs";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { runProcess } from "./_testutil.mjs";
 
 const ROOT = "D:/core/web/dbx-pj/dbx-md-notes";
 const BINARY = "dbx-plugin-mdnotes";
@@ -49,15 +49,20 @@ for (const t of list) {
 const mani = JSON.parse(fs.readFileSync(path.join(ROOT, "manifest.json"), "utf8"));
 const ver = mani.version;
 
-function run(cmd, args, opts = {}) {
-  const r = spawnSync(cmd, args, { cwd: ROOT, encoding: "utf8", ...opts });
-  if (r.stdout) process.stdout.write(r.stdout);
-  if (r.stderr) process.stderr.write(r.stderr);
-  if (r.status !== 0) {
-    console.error(`[FATAL] 命令失败（exit ${r.status}）：${cmd} ${args.join(" ")}`);
+// 用**异步** spawn（见 _testutil.mjs）：本机沙箱里 spawnSync 对任何 exe 都直接 EBUSY。
+async function run(cmd, args, opts = {}) {
+  const r = await runProcess(cmd, args, { cwd: ROOT, env: opts.env || process.env, timeoutMs: 600000 });
+  if (r.out) process.stdout.write(r.out);
+  if (r.err) process.stderr.write(r.err);
+  if (r.error) {
+    console.error(`[FATAL] 无法执行命令（${r.error.message}）：${cmd} ${args.join(" ")}`);
     process.exit(1);
   }
-  return r.stdout || "";
+  if (r.code !== 0) {
+    console.error(`[FATAL] 命令失败（exit ${r.code}${r.signal ? " signal=" + r.signal : ""}）：${cmd} ${args.join(" ")}`);
+    process.exit(1);
+  }
+  return r.out || "";
 }
 
 console.log(`=== 构建 ${list.length} 个平台：${list.join(", ")} ===\n`);
@@ -71,7 +76,7 @@ for (const t of list) {
     : `../_xbuild/${BINARY}-${goos}-${goarch}`;
   const shown = outArg.replace(/^\.\.\//, "");
   process.stdout.write(`[build] ${t.padEnd(13)} GOOS=${goos} GOARCH=${goarch} -> ${shown}\n`);
-  run(GO, ["build", "-C", "backend", "-o", outArg, "."], {
+  await run(GO, ["build", "-C", "backend", "-o", outArg, "."], {
     env: { ...process.env, GOROOT, CGO_ENABLED: "0", GOOS: goos, GOARCH: goarch },
   });
 }
@@ -79,7 +84,7 @@ for (const t of list) {
 // ---- 2) 逐平台打包 ----
 console.log("");
 for (const t of list) {
-  run(NODE, [path.join(ROOT, "_buildpkg.js"), "--target", t]);
+  await run(NODE, [path.join(ROOT, "_buildpkg.js"), "--target", t]);
 }
 
 // ---- 3) 逐包校验（包结构 / checksums / executable 路径与扩展名） ----
@@ -87,7 +92,7 @@ console.log("");
 const pkgOf = (t) => path.join(ROOT, "dist", `${mani.id}-${ver}-${t}.dbxp`);
 for (const t of list) {
   console.log(`--- verify ${t} ---`);
-  run(NODE, [path.join(ROOT, "_verify.mjs"), pkgOf(t)]);
+  await run(NODE, [path.join(ROOT, "_verify.mjs"), pkgOf(t)]);
 }
 
 // ---- 4) 汇总 release-candidates.json ----

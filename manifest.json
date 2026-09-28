@@ -2,10 +2,10 @@
   "$schema": "https://raw.githubusercontent.com/t8y2/dbx/main/plugins/manifest.schema.json",
   "manifest_version": 1,
   "id": "com.lwai.mdnotes",
-  "name": "MD 笔记",
-  "version": "0.8.1",
+  "name": "AI.MD 笔记",
+  "version": "0.8.3",
   "publisher": "lwai",
-  "description": "Markdown 笔记，支持连接类型：在 DBX 中新建「MD 笔记」连接即可打开笔记工作台。笔记落盘到连接配置里的存储目录，并可作为 mdnotes:// 虚拟文件系统浏览编辑。内置 AI 助手（右侧常驻栏），可接入任意 OpenAI 兼容 / Anthropic / Ollama 模型对笔记做分析、润色、续写与问答。",
+  "description": "Markdown 笔记，支持连接类型：在 DBX 中新建「AI.MD 笔记」连接即可打开笔记工作台。笔记落盘到连接配置里的存储目录，并可作为 mdnotes:// 虚拟文件系统浏览编辑。内置 AI 助手（右侧常驻栏），可接入任意 OpenAI 兼容 / Anthropic / Ollama 模型对笔记做分析、润色、续写与问答。",
   "icon": "assets/plugin.svg",
   "engines": {
     "dbx": ">=0.5.68",
@@ -27,15 +27,15 @@
     {
       "type": "workbench",
       "id": "com.lwai.mdnotes.main",
-      "label": "MD 笔记",
+      "label": "AI.MD 笔记",
       "description": "Markdown 笔记工作台",
       "icon": "assets/plugin.svg"
     },
     {
       "type": "connection-provider",
       "id": "com.lwai.mdnotes.conn",
-      "label": "MD 笔记",
-      "description": "创建一个 MD 笔记连接，用于打开独立的 Markdown 笔记工作台。",
+      "label": "AI.MD 笔记",
+      "description": "创建一个 AI.MD 笔记连接，用于打开独立的 Markdown 笔记工作台。",
       "icon": "assets/plugin.svg",
       "database_type": "mdnotes",
       "workbench": "com.lwai.mdnotes.main",
@@ -51,7 +51,7 @@
           "type": "text",
           "binding": "name",
           "required": true,
-          "default": "MD 笔记",
+          "default": "AI.MD 笔记",
           "description": "显示在连接列表中的名称。"
         },
         {
@@ -205,7 +205,7 @@
     {
       "type": "filesystem-provider",
       "id": "com.lwai.mdnotes.fs",
-      "label": "MD 笔记",
+      "label": "AI.MD 笔记",
       "description": "把笔记以 .md 文件形式暴露给 DBX 通用文件管理器（mdnotes://）。",
       "icon": "assets/plugin.svg",
       "schemes": [
@@ -223,16 +223,16 @@
   ],
   "localizations": {
     "en": {
-      "name": "MD Notes",
-      "description": "Markdown notes connection type: create an MD Notes connection to open the notebook workbench. Notes are persisted by the sidecar into the storage directory and exposed as an mdnotes:// virtual filesystem.",
+      "name": "AI.MD Notes",
+      "description": "Markdown notes connection type: create an AI.MD Notes connection to open the notebook workbench. Notes are persisted by the sidecar into the storage directory and exposed as an mdnotes:// virtual filesystem.",
       "contributions": {
         "com.lwai.mdnotes.main": {
-          "label": "MD Notes",
+          "label": "AI.MD Notes",
           "description": "Markdown notes workbench"
         },
         "com.lwai.mdnotes.conn": {
-          "label": "MD Notes",
-          "description": "Create an MD Notes connection to open a standalone Markdown notebook workbench.",
+          "label": "AI.MD Notes",
+          "description": "Create an AI.MD Notes connection to open a standalone Markdown notebook workbench.",
           "fields": {
             "display_name": {
               "label": "Connection name",
@@ -246,7 +246,7 @@
           }
         },
         "com.lwai.mdnotes.fs": {
-          "label": "MD Notes",
+          "label": "AI.MD Notes",
           "description": "Expose notes as .md files in the DBX file manager (mdnotes://)."
         }
       }

@@ -109,7 +109,7 @@ if (badRefs.length) {
 
 // (b) 关键 UI 节点必须在 index.html 里真实存在
 const CRITICAL = ["main", "store-status", "store-text", "tree", "editor", "title",
-  "ai-panel", "aip-log", "aip-go", "gutter-side", "gutter-ai"];
+  "ai-panel", "aip-scroll", "aip-log", "aip-go", "aip-target", "aip-mode-none", "gutter-side", "gutter-ai"];
 const missingCritical = CRITICAL.filter(id => !liveIds.has(id));
 if (missingCritical.length) {
   console.error("\n[FATAL] index.html 缺少关键元素：" + missingCritical.join(", ") + "\n");

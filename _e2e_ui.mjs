@@ -23,6 +23,7 @@ import path from "node:path";
 import http from "node:http";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
+import { removeTree } from "./_testutil.mjs";
 
 const NODE_WS = "C:/Users/Luke-pc/.workbuddy/binaries/node/workspace/package.json";
 const require = createRequire(NODE_WS);
@@ -37,7 +38,7 @@ const SAVED_DIR = path.join(TMP, "saved");   // 模拟「用户在原生另存�
 const BRIDGE_PAYLOAD_LIMIT = 2 * 1024 * 1024;
 const CONN_ID = "e2e-ui-conn-1";
 
-fs.rmSync(TMP, { recursive: true, force: true });
+removeTree(TMP);   // 见 _testutil.mjs：沙箱把 rmSync 接管成回收站，目录一大就超时
 fs.mkdirSync(STORAGE_DIR, { recursive: true });
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(SAVED_DIR, { recursive: true });
@@ -597,8 +598,35 @@ if (bkCall && fs.existsSync(bkCall.path)) {
       ["分析", "润色", "续写", "提问"].every((t) =>
         [...$("aip-tabs").querySelectorAll("button")].some((b) => b.textContent === t)),
       [...$("aip-tabs").querySelectorAll("button")].map((b) => b.textContent).join(" | "));
-    check("范围提示指向当前笔记", /《.+》/.test($("aip-scope").textContent), $("aip-scope").textContent);
     check("AI 栏有对话记录区与输入区", !!$("aip-log") && !!$("aip-input") && !!$("aip-go"));
+
+    // --- 分析对象：必须可切换、可清除，并显示将要发送的内容 ---
+    check("分析对象区显示对象与字数",
+      /《.+》/.test($("aip-target").textContent) && /字/.test($("aip-target").textContent),
+      $("aip-target").textContent.slice(0, 120));
+    check("对象区带内容预览（能看出将要发什么出去）",
+      !!$("aip-target").querySelector(".aip-target-preview"));
+    check("四种对象来源都在（自动跟随 / 选中内容 / 整篇笔记 / 清除）",
+      ["aip-mode-auto", "aip-mode-selection", "aip-mode-note", "aip-mode-none"].every((id) => !!$(id)));
+    check("默认是「自动跟随」", $("aip-mode-auto").classList.contains("active"));
+
+    $("aip-mode-note").click();
+    await sleep(60);
+    check("切到「整篇笔记」后对象摘要随之变化（可变更）",
+      $("aip-mode-note").classList.contains("active") && /整篇笔记/.test($("aip-target").textContent),
+      $("aip-target").textContent.slice(0, 120));
+
+    $("aip-mode-none").click();
+    await sleep(60);
+    check("「清除」后对象被清空并明说不发送正文",
+      $("aip-mode-none").classList.contains("active") && /已清除/.test($("aip-target").textContent),
+      $("aip-target").textContent.slice(0, 120));
+
+    $("aip-mode-auto").click();
+    await sleep(60);
+    check("切回「自动跟随」后对象恢复",
+      $("aip-mode-auto").classList.contains("active") && /字/.test($("aip-target").textContent),
+      $("aip-target").textContent.slice(0, 120));
 
     await sleep(500);   // 等 ai/config 回来
     check("未配置 AI：给出可操作的提示而不是报错",
@@ -699,6 +727,43 @@ if (bkCall && fs.existsSync(bkCall.path)) {
     $("aip-go").disabled === false && /fake-e2e/.test($("aip-model").textContent),
     $("aip-model").textContent + " | " + $("aip-status").textContent);
   check("就绪后不再提示「还缺」", !/还缺/.test($("aip-status").textContent), $("aip-status").textContent);
+
+  // --- 对象可控：清除后不能生成，切回来才能生成 ---
+  $("aip-mode-none").click();
+  await sleep(90);
+  check("清除对象后「生成」被禁用（不会发出空对象请求）",
+    $("aip-go").disabled === true && /已清除/.test($("aip-status").textContent), $("aip-status").textContent);
+  check("清除后对象区给出恢复方式",
+    /清除|整篇笔记|自动跟随/.test($("aip-target").textContent), $("aip-target").textContent.slice(0, 140));
+
+  $("aip-mode-note").click();
+  await sleep(90);
+  check("切到「整篇笔记」后「生成」重新可用",
+    $("aip-go").disabled === false && /就绪/.test($("aip-status").textContent), $("aip-status").textContent);
+
+  $("aip-mode-selection").click();
+  await sleep(90);
+  check("「选中内容」但没划选时给出提示且不可生成",
+    $("aip-go").disabled === true && /没有选中内容/.test($("aip-status").textContent), $("aip-status").textContent);
+
+  // --- 实时跟随：划选后对象自己变过去（不是打开时钉死的旧值）---
+  $("aip-mode-auto").click();
+  await sleep(60);
+  const edLive = $("editor");
+  edLive.selectionStart = 0;
+  edLive.selectionEnd = 6;
+  fire(edLive, "select", {});
+  await sleep(220);   // 对象刷新有 60ms 节流
+  check("在编辑器里划选后，对象自动变成「选中内容」（实时刷新）",
+    /选中内容/.test($("aip-target").textContent) && /选中内容/.test($("aip-status").textContent),
+    $("aip-target").textContent.slice(0, 140) + " || " + $("aip-status").textContent);
+
+  // 收尾：清掉选区、回到整篇（后面的回写用例针对整篇笔记）
+  edLive.selectionStart = edLive.selectionEnd = 0;
+  fire(edLive, "select", {});
+  await sleep(220);
+  check("取消划选后对象自动回到「整篇笔记」",
+    /整篇笔记/.test($("aip-target").textContent), $("aip-target").textContent.slice(0, 140));
 
   const editor = $("editor");
   const before = String(editor.value || "");

@@ -12,6 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import { spawn } from "node:child_process";
+import { removeTree } from "./_testutil.mjs";
 
 const ROOT = "D:/core/web/dbx-pj/dbx-md-notes";
 const HOST_SRC = "C:/Users/Luke-pc/AppData/Local/Temp/opencode/dbx-src/dbx-main/apps/desktop/src/lib/plugins/pluginHostBridge.ts";
@@ -22,7 +23,7 @@ const DATA_DIR = path.join(TMP, "data");
 const SAVED_DIR = path.join(TMP, "saved");   // 模拟「用户在原生另存为对话框里选的目录」
 const BRIDGE_PAYLOAD_LIMIT = 2 * 1024 * 1024;
 
-fs.rmSync(TMP, { recursive: true, force: true });
+removeTree(TMP);   // 见 _testutil.mjs：沙箱把 rmSync 接管成回收站，目录一大就超时
 fs.mkdirSync(STORAGE_DIR, { recursive: true });
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(SAVED_DIR, { recursive: true });
