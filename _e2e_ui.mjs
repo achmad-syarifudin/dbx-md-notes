@@ -23,14 +23,13 @@ import path from "node:path";
 import http from "node:http";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 import { removeTree } from "./_testutil.mjs";
 
-const NODE_WS = "C:/Users/Luke-pc/.workbuddy/binaries/node/workspace/package.json";
-const require = createRequire(NODE_WS);
-const { JSDOM } = require("jsdom");
-
-const ROOT = "D:/core/web/dbx-pj/dbx-md-notes";
-const EXE = path.join(ROOT, "backend/dbx-plugin-mdnotes.exe");
+const ROOT = path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(path.join(ROOT, "_e2e_ui.mjs"));
+const { JSDOM } = require(process.env.DBX_JSDOM || "jsdom");
+const EXE = process.env.DBX_SIDECAR || path.join(ROOT, "_xbuild/dbx-plugin-mdnotes-linux-amd64");
 const TMP = path.join(ROOT, "_e2e_ui_tmp");
 const STORAGE_DIR = path.join(TMP, "storage");
 const DATA_DIR = path.join(TMP, "data");

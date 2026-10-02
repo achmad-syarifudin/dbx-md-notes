@@ -99,13 +99,13 @@ func loadAIConfigFromDisk() {
 	var f aiConfigFile
 	if json.Unmarshal(b, &f) != nil {
 		// 文件损坏时当作没有，不阻断启动（下次保存会覆盖掉）
-		sidecarTrace("ai-config.json 解析失败，已忽略")
+		sidecarTrace("ai-config.json parse failed; ignoring file")
 		return
 	}
 	aiLocal = f.aiSettings
 	aiRememberKey = f.RememberKey && f.APIKey != ""
 	aiLocalHasFile = true
-	sidecarTrace(fmt.Sprintf("ai-config 已加载 provider=%s model=%s hasKey=%v",
+	sidecarTrace(fmt.Sprintf("ai-config loaded provider=%s model=%s hasKey=%v",
 		aiLocal.Provider, aiLocal.Model, aiLocal.APIKey != ""))
 }
 
@@ -457,20 +457,20 @@ func aiConfigView() map[string]any {
 
 /* ---------------- 请求构造 ---------------- */
 
-const aiDefaultSystem = "你是一位严谨的中文技术写作助手，服务于数据库工程师。回答直接、具体、不寒暄；" +
-	"不要复述原文，不要输出与请求无关的建议。"
+const aiDefaultSystem = "You are a precise technical writing assistant for database engineers. " +
+	"Answer directly and specifically without pleasantries. Do not repeat source text or add unrelated advice."
 
 // aiTaskLabel 给错误信息用的人话任务名（前端传的是 analyze/polish/... 这种 id）。
 func aiTaskLabel(task string) string {
 	switch task {
 	case "analyze":
-		return "分析"
+		return "Analyze"
 	case "polish":
-		return "润色"
+		return "Polish"
 	case "continue":
-		return "续写"
+		return "Continue writing"
 	case "ask":
-		return "提问"
+		return "Ask"
 	}
 	return task
 }
@@ -489,47 +489,47 @@ func aiTaskPrompt(task, text, instruction string) (system, user string) {
 	switch task {
 	case "analyze":
 		if !has {
-			return aiDefaultSystem, "我这次没有提供要分析的笔记。请直接告诉我需要分析什么。"
+			return aiDefaultSystem, "I haven't provided a note to analyze. Please tell me what you need to analyze."
 		}
 		return aiDefaultSystem,
-			"请分析下面这篇笔记，输出：\n1) 3–6 条要点（每条一行，用 - 开头）\n2) 其中需要跟进的事项（没有就写\"无\"）\n3) 内容里相互矛盾或与事实明显不符之处（没有就写\"无\"）\n\n笔记正文：\n\n" + text
+			"Analyze the following note and provide:\n1) 3–6 key points (one per line, starting with -)\n2) Items requiring follow-up (write \"None\" if there are none)\n3) Contradictions or clear factual errors (write \"None\" if there are none)\n\nNote content:\n\n" + text
 	case "polish":
 		if !has {
-			return aiDefaultSystem, "我这次没有提供要润色的正文。请把需要润色的内容发给我。"
+			return aiDefaultSystem, "I haven't provided text to polish. Please send the text you want polished."
 		}
 		extra := ""
 		if instruction != "" {
-			extra = "\n额外要求：" + instruction
+			extra = "\nAdditional instructions: " + instruction
 		}
 		return aiDefaultSystem,
-			"请润色下面的 Markdown 笔记：保持原意、保持 Markdown 结构与代码块不变，改善语句通顺度与用词准确度，" +
-				"不要增删事实，不要加解释。**只输出润色后的正文本身**。" + extra + "\n\n笔记正文：\n\n" + text
+			"Polish the following Markdown note. Preserve its meaning, Markdown structure, and code blocks while improving clarity and word choice. " +
+				"Do not add or remove facts or include explanations. **Output only the polished text.**" + extra + "\n\nNote content:\n\n" + text
 	case "continue":
 		if !has {
-			dir := "请写一段 Markdown 内容"
+			dir := "Write some Markdown content"
 			if instruction != "" {
-				dir = "请按要求写一段 Markdown 内容（要求：" + instruction + "）"
+				dir = "Write Markdown content following these instructions (" + instruction + ")"
 			}
-			return aiDefaultSystem, dir + "。**只输出内容本身**，不要解释、不要加前后缀。"
+			return aiDefaultSystem, dir + ". **Output only the content**, without explanations, prefixes, or suffixes."
 		}
 		extra := ""
 		if instruction != "" {
-			extra = "（写作方向：" + instruction + "）"
+			extra = " (writing direction: " + instruction + ")"
 		}
 		return aiDefaultSystem,
-			"下面是一篇 Markdown 笔记，请在末尾自然地续写下去" + extra +
-				"，保持原有风格与 Markdown 结构。**只输出续写的内容本身**，不要重复已有内容，不要加解释。\n\n已有内容：\n\n" + text
+			"Continue this Markdown note naturally at the end" + extra +
+				", preserving its style and Markdown structure. **Output only the new content**; do not repeat existing content or add explanations.\n\nExisting content:\n\n" + text
 	case "ask":
 		q := instruction
 		if q == "" {
-			q = "这篇笔记讲了什么？"
+			q = "What is this note about?"
 		}
 		if !has {
 			return aiDefaultSystem,
-				"回答我的问题。**我这次没有提供笔记原文**，请只依据问题本身作答，不要假装读过任何笔记。\n\n问题：" + q
+				"Answer my question. **I haven't provided any note text**, so answer based only on the question and do not pretend to have read a note.\n\nQuestion: " + q
 		}
 		return aiDefaultSystem,
-			"根据下面的笔记回答我的问题；笔记里没有的信息就直说没有，不要编造。\n\n问题：" + q + "\n\n笔记正文：\n\n" + text
+			"Answer my question using the note below. If the note lacks the information, say so; do not invent it.\n\nQuestion: " + q + "\n\nNote content:\n\n" + text
 	default:
 		return aiDefaultSystem, text
 	}
@@ -538,14 +538,14 @@ func aiTaskPrompt(task, text, instruction string) (system, user string) {
 func aiEndpoint(c aiSettings) (string, error) {
 	base := strings.TrimRight(strings.TrimSpace(c.BaseURL), "/")
 	if base == "" {
-		return "", fmt.Errorf("未配置 API 地址")
+		return "", fmt.Errorf("API URL is not configured")
 	}
 	u, err := url.Parse(base)
 	if err != nil || u.Scheme == "" || u.Host == "" {
-		return "", fmt.Errorf("API 地址不是合法的 URL：%s", c.BaseURL)
+		return "", fmt.Errorf("API URL is invalid: %s", c.BaseURL)
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
-		return "", fmt.Errorf("API 地址只支持 http/https")
+		return "", fmt.Errorf("API URL must use HTTP or HTTPS")
 	}
 	path := strings.TrimRight(u.Path, "/")
 	if c.Provider == "anthropic" {
@@ -598,10 +598,10 @@ type aiResult struct {
 // 「测试连接」因此可以在不改动生效配置的前提下试一套未保存的参数。
 func aiCall(reqText aiRequest, maxTokens int, c aiSettings) (*aiResult, error) {
 	if !aiIsEnabled(c) {
-		return nil, fmt.Errorf("AI 功能未启用：请在连接设置或 AI 助手栏的配置里勾选「启用 AI 功能」")
+		return nil, fmt.Errorf("AI is disabled. Enable AI in the connection settings or AI assistant settings.")
 	}
 	if c.Model == "" {
-		return nil, fmt.Errorf("未配置模型名称")
+		return nil, fmt.Errorf("Model name is not configured")
 	}
 	endpoint, err := aiEndpoint(c)
 	if err != nil {
@@ -625,7 +625,7 @@ func aiCall(reqText aiRequest, maxTokens int, c aiSettings) (*aiResult, error) {
 			"messages":   []map[string]any{{"role": "user", "content": aiTaskPromptUser(reqText, text)}},
 		}
 		if c.APIKey == "" {
-			return nil, fmt.Errorf("未配置 API 密钥")
+			return nil, fmt.Errorf("API key is not configured")
 		}
 		headers["x-api-key"] = c.APIKey
 		headers["anthropic-version"] = "2023-06-01"
@@ -640,21 +640,21 @@ func aiCall(reqText aiRequest, maxTokens int, c aiSettings) (*aiResult, error) {
 		}
 		if c.Provider != "ollama" {
 			if c.APIKey == "" {
-				return nil, fmt.Errorf("未配置 API 密钥")
+				return nil, fmt.Errorf("API key is not configured")
 			}
 			headers["Authorization"] = "Bearer " + c.APIKey
 		}
 	}
 	payload, err := json.Marshal(body)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败：%v", err)
+		return nil, fmt.Errorf("Could not create request: %v", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(c.TimeoutSecs)*time.Second)
 	defer cancel()
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败：%v", err)
+		return nil, fmt.Errorf("Could not create request: %v", err)
 	}
 	for k, v := range headers {
 		httpReq.Header.Set(k, v)
@@ -664,9 +664,9 @@ func aiCall(reqText aiRequest, maxTokens int, c aiSettings) (*aiResult, error) {
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return nil, fmt.Errorf("请求超时（%d 秒）：模型没有在限定时间内响应，可在 AI 助手栏的配置里调大超时", c.TimeoutSecs)
+			return nil, fmt.Errorf("Request timed out after %d seconds. Increase the timeout in AI assistant settings if the model needs more time.", c.TimeoutSecs)
 		}
-		return nil, fmt.Errorf("连接模型服务失败：%s", redact(err.Error(), c))
+		return nil, fmt.Errorf("Could not connect to the model service: %s", redact(err.Error(), c))
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, aiMaxResponseBytes))
@@ -689,7 +689,7 @@ func aiCall(reqText aiRequest, maxTokens int, c aiSettings) (*aiResult, error) {
 			} `json:"usage"`
 		}
 		if err := json.Unmarshal(raw, &r); err != nil {
-			return nil, fmt.Errorf("无法解析模型返回：%s", redact(snippet(raw), c))
+			return nil, fmt.Errorf("Could not parse the model response: %s", redact(snippet(raw), c))
 		}
 		for _, part := range r.Content {
 			if part.Type == "text" || part.Type == "" {
@@ -713,7 +713,7 @@ func aiCall(reqText aiRequest, maxTokens int, c aiSettings) (*aiResult, error) {
 			Error any `json:"error"`
 		}
 		if err := json.Unmarshal(raw, &r); err != nil {
-			return nil, fmt.Errorf("无法解析模型返回：%s", redact(snippet(raw), c))
+			return nil, fmt.Errorf("Could not parse the model response: %s", redact(snippet(raw), c))
 		}
 		if len(r.Choices) > 0 {
 			out.Content = r.Choices[0].Message.Content
@@ -725,7 +725,7 @@ func aiCall(reqText aiRequest, maxTokens int, c aiSettings) (*aiResult, error) {
 	}
 	out.Content = strings.TrimSpace(out.Content)
 	if out.Content == "" {
-		return nil, fmt.Errorf("模型返回了空内容")
+		return nil, fmt.Errorf("The model returned an empty response")
 	}
 	return out, nil
 }
@@ -747,7 +747,7 @@ func snippet(b []byte) string {
 		s = s[:300] + "…"
 	}
 	if s == "" {
-		return "(空响应)"
+		return "(empty response)"
 	}
 	return s
 }
@@ -756,16 +756,16 @@ func aiHTTPError(status int, body []byte, c aiSettings) string {
 	detail := snippet(body)
 	switch status {
 	case 401, 403:
-		return fmt.Sprintf("鉴权失败（HTTP %d）：API 密钥无效或没有权限。%s", status, redact(detail, c))
+		return fmt.Sprintf("Authentication failed (HTTP %d): The API key is invalid or lacks permission. %s", status, redact(detail, c))
 	case 404:
-		return fmt.Sprintf("找不到接口（HTTP 404）：请检查 API 地址是否正确（需要包含 /v1 之类的版本路径）。%s", redact(detail, c))
+		return fmt.Sprintf("Endpoint not found (HTTP 404): Check the API URL, including any required version path such as /v1. %s", redact(detail, c))
 	case 429:
-		return fmt.Sprintf("被限流（HTTP 429）：请求过于频繁或额度用尽。%s", redact(detail, c))
+		return fmt.Sprintf("Rate limited (HTTP 429): Too many requests or quota exhausted. %s", redact(detail, c))
 	}
 	if status >= 500 {
-		return fmt.Sprintf("模型服务异常（HTTP %d）：稍后重试。%s", status, redact(detail, c))
+		return fmt.Sprintf("Model service error (HTTP %d): Try again later. %s", status, redact(detail, c))
 	}
-	return fmt.Sprintf("请求失败（HTTP %d）：%s", status, redact(detail, c))
+	return fmt.Sprintf("Request failed (HTTP %d): %s", status, redact(detail, c))
 }
 
 /* ---------------- RPC ---------------- */
@@ -784,17 +784,17 @@ func aiChatHandler(raw json.RawMessage) (any, *dbxpluginsdk.PluginError) {
 	if strings.TrimSpace(req.Text) == "" {
 		if aiTaskNeedsText(req.Task) {
 			// 「分析/润色」没有正文做不了：给出可操作的说法，别只说"缺少要处理的正文"
-			return nil, badParams("「%s」需要有正文：请选中一段内容、或把分析对象切成「整篇笔记」。"+
-				"（想不带笔记直接聊，用「提问」）", aiTaskLabel(req.Task))
+			return nil, badParams("%s requires note text. Select some content or switch the scope to the entire note. "+
+				"(To chat without a note, use Ask.)", aiTaskLabel(req.Task))
 		}
 		if strings.TrimSpace(req.Instruction) == "" {
-			return nil, badParams("没有可处理的内容：请在下方写下你的问题（或要求）")
+			return nil, badParams("Nothing to process. Enter a question or instruction below.")
 		}
 	}
 	switch req.Task {
 	case "analyze", "polish", "continue", "ask":
 	default:
-		return nil, badParams("不支持的 AI 任务：%s", req.Task)
+		return nil, badParams("Unsupported AI task: %s", req.Task)
 	}
 	cfg := aiEffective()
 	started := time.Now()
@@ -891,8 +891,8 @@ func aiSetConfigHandler(raw json.RawMessage) (any, *dbxpluginsdk.PluginError) {
 	aiMu.Unlock()
 
 	if saveErr != nil {
-		sidecarTrace("ai/setConfig 保存失败：" + saveErr.Error())
-		return nil, failed(-32011, fmt.Errorf("保存 AI 配置失败：%v", saveErr))
+		sidecarTrace("ai/setConfig save failed: " + saveErr.Error())
+		return nil, failed(-32011, fmt.Errorf("Could not save AI settings: %v", saveErr))
 	}
 	sidecarTrace(fmt.Sprintf("ai/setConfig ok persist=%v enabled=%v model=%s hasKey=%v keyOnDisk=%v",
 		persist, p.Enabled != nil && *p.Enabled, model, p.APIKey != "", keyOnDisk))
@@ -910,7 +910,7 @@ func aiResetConfigHandler() (any, *dbxpluginsdk.PluginError) {
 	aiRememberKey = false
 	aiMu.Unlock()
 	if err := os.Remove(aiConfigPath()); err != nil && !os.IsNotExist(err) {
-		return nil, failed(-32011, fmt.Errorf("删除本机 AI 配置失败：%v", err))
+		return nil, failed(-32011, fmt.Errorf("Could not remove local AI settings: %v", err))
 	}
 	sidecarTrace("ai/resetConfig ok")
 	out := aiConfigView()
@@ -943,13 +943,13 @@ func aiTestHandler(raw json.RawMessage) (any, *dbxpluginsdk.PluginError) {
 	applyOver(&cfg, ov)
 
 	if !aiIsEnabled(cfg) {
-		return map[string]any{"success": false, "message": "AI 功能未启用：请勾选「启用 AI 功能」"}, nil
+		return map[string]any{"success": false, "message": "AI is disabled. Enable AI to test the connection."}, nil
 	}
 	if cfg.BaseURL == "" || cfg.Model == "" {
-		return map[string]any{"success": false, "message": "请先填写 API 地址与模型名称"}, nil
+		return map[string]any{"success": false, "message": "Enter an API URL and model name first."}, nil
 	}
 	started := time.Now()
-	res, err := aiCall(aiRequest{Task: "ask", Text: "ping", Instruction: "只回复两个字：正常"}, 32, cfg)
+	res, err := aiCall(aiRequest{Task: "ask", Text: "ping", Instruction: "Reply with only: OK"}, 32, cfg)
 	if err != nil {
 		sidecarTrace("ai/test FAILED err=" + err.Error())
 		return map[string]any{"success": false, "message": err.Error()}, nil
@@ -960,7 +960,7 @@ func aiTestHandler(raw json.RawMessage) (any, *dbxpluginsdk.PluginError) {
 	}
 	return map[string]any{
 		"success": true,
-		"message": fmt.Sprintf("连接成功：%s（%s）· 耗时 %d ms · 返回：%s",
+		"message": fmt.Sprintf("Connection successful: %s (%s) · %d ms · Response: %s",
 			model, cfg.Provider, time.Since(started).Milliseconds(), snippet([]byte(res.Content))),
 	}, nil
 }

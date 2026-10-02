@@ -27,10 +27,10 @@
   function on(id, evName, handler, optional) {
     var el = $(id);
     if (!el) {
-      S.log("绑定 " + evName + " → #" + id, optional ? null : false,
+      S.log("Bind " + evName + " → #" + id, optional ? null : false,
         optional
-          ? "元素不存在（HTML 里未启用），该功能按未启用处理"
-          : "DOM 中不存在该元素（被注释/删除），该功能不可用；其余绑定不受影响（已不再连坐）");
+          ? "Element not found (disabled in HTML); feature skipped"
+          : "Element not found in DOM (commented out or removed); feature unavailable, other bindings unaffected");
       return null;
     }
     el[evName] = handler;
@@ -43,11 +43,11 @@
     var where = (e && e.filename)
       ? " @ " + String(e.filename).split(/[\\/]/).pop() + ":" + (e.lineno || 0) + ":" + (e.colno || 0)
       : "";
-    S.log("页面 JS 错误", false, ((e && e.message) || "未知错误") + where);
+    S.log("Page JavaScript error", false, ((e && e.message) || "Unknown error") + where);
   });
   window.addEventListener("unhandledrejection", function (e) {
     var r = e && e.reason;
-    S.log("未处理的 Promise 异常", false, (r && (r.message || r.stack)) || String(r));
+    S.log("Unhandled Promise rejection", false, (r && (r.message || r.stack)) || String(r));
   });
 
   var state = {
@@ -170,8 +170,8 @@
       if (x && x.type === "note" && x.contentMissing) { state.contentMissing[x.id] = true; n++; }
     });
     if (n) {
-      toast(n + " 篇笔记的正文文件读不到，已冻结（不会写回覆盖）。请检查存储目录。", "warn");
-      S.log("载入发现正文缺失的笔记", false, n + " 篇已冻结");
+      toast(n + " notes have unreadable content files. Editing is locked to prevent overwriting them. Check the storage directory.", "warn");
+      S.log("Notes with missing content found during load", false, n + " locked");
     }
     return n;
   }
@@ -298,14 +298,14 @@
         };
         card.appendChild(input);
         modalButtons(card, [
-          { text: "取消", onClick: function () { done(false); } },
-          { text: okText || "确定", primary: true, onClick: function () { done(true); } }
+          { text: "Cancel", onClick: function () { done(false); } },
+          { text: okText || "OK", primary: true, onClick: function () { done(true); } }
         ]);
       });
       function done(ok) {
         if (!ok) { closeModal(); resolve(null); return; }
         var v = String(input.value || "").trim();
-        if (!v) { toast("名称不能为空", "warn"); return; }
+        if (!v) { toast("Name cannot be empty", "warn"); return; }
         closeModal(); resolve(v);
       }
     });
@@ -316,8 +316,8 @@
         var h = document.createElement("h3"); h.textContent = title; card.appendChild(h);
         var p = document.createElement("p"); p.className = "m-msg"; p.textContent = message; card.appendChild(p);
         modalButtons(card, [
-          { text: "取消", onClick: function () { closeModal(); resolve(false); } },
-          { text: okText || "确定", primary: !danger, danger: !!danger, onClick: function () { closeModal(); resolve(true); } }
+          { text: "Cancel", onClick: function () { closeModal(); resolve(false); } },
+          { text: okText || "OK", primary: !danger, danger: !!danger, onClick: function () { closeModal(); resolve(true); } }
         ]);
       });
     });
@@ -326,10 +326,10 @@
     return new Promise(function (resolve) {
       var sel;
       openModal(function (card) {
-        var h = document.createElement("h3"); h.textContent = "移动到…"; card.appendChild(h);
+        var h = document.createElement("h3"); h.textContent = "Move to…"; card.appendChild(h);
         var p = document.createElement("p");
         p.className = "m-msg";
-        p.textContent = "把「" + node.name + "」移动到：" + (node.type === "folder" ? "（整棵子树一起移动）" : "");
+        p.textContent = "Move “" + node.name + "” to:" + (node.type === "folder" ? " (including all its contents)" : "");
         card.appendChild(p);
         sel = document.createElement("select");
         sel.className = "m-input";
@@ -340,14 +340,14 @@
         });
         card.appendChild(sel);
         modalButtons(card, [
-          { text: "取消", onClick: function () { closeModal(); resolve(null); } },
-          { text: "移动", primary: true, onClick: function () { closeModal(); resolve(sel.value); } }
+          { text: "Cancel", onClick: function () { closeModal(); resolve(null); } },
+          { text: "Move", primary: true, onClick: function () { closeModal(); resolve(sel.value); } }
         ]);
       });
     });
   }
   function folderOptions(excludeId) {
-    var out = [{ id: "", label: "（根目录）" }];
+    var out = [{ id: "", label: "(Root)" }];
     function walk(pid, depth) {
       sortNodes(childrenOf(pid)).forEach(function (n) {
         if (n.type !== "folder") { return; }
@@ -449,7 +449,7 @@
   function makeGhost(n) {
     var g = document.createElement("div");
     g.className = "drag-ghost";
-    g.textContent = (n.type === "folder" ? "[文件夹] " : "[笔记] ") + (n.name || "");
+    g.textContent = (n.type === "folder" ? "[Folder] " : "[Note] ") + (n.name || "");
     document.body.appendChild(g);
     return g;
   }
@@ -588,7 +588,7 @@
     if (rows.length === 0) {
       var empty = document.createElement("div");
       empty.className = "tree-empty";
-      empty.textContent = q ? "没有匹配的笔记" : "还没有任何笔记，点击「+ 新建笔记」开始";
+      empty.textContent = q ? "No matching notes" : "No notes yet. Click “+ New note” to get started.";
       tree.appendChild(empty);
     } else {
       rows.forEach(function (r) { tree.appendChild(r); });
@@ -622,8 +622,8 @@
     var frozen = !!state.contentMissing[n.id];
     editor.readOnly = frozen;
     editor.placeholder = frozen
-      ? "⚠ 这篇笔记的正文文件读不到（可能被移动/改名/占用），已冻结编辑以防覆盖。请检查「笔记存储目录」。"
-      : "在此输入 Markdown…（支持标题、列表、代码块、表格、加粗、引用；```sql 代码块会高亮）";
+      ? "This note's content file cannot be read (it may have been moved, renamed, or locked). Editing is disabled to prevent overwriting it. Check the notes storage directory."
+      : "Write Markdown here… (headings, lists, code blocks, tables, bold text, and quotes; ```sql blocks are highlighted)";
     if (title.value !== n.name && document.activeElement !== title) { title.value = n.name; }
     if (frozen) { editor.value = ""; }
     else if (editor.value !== (n.content || "") && document.activeElement !== editor) { editor.value = n.content || ""; }
@@ -641,14 +641,14 @@
   function updateCounter() {
     var n = activeNote();
     var el = $("counter");
-    if (!n) { el.textContent = "0 字"; $("note-meta").textContent = ""; return; }
+    if (!n) { el.textContent = "0 characters"; $("note-meta").textContent = ""; return; }
     var txt = n.content || "";
     var lines = txt ? txt.split(/\r?\n/).length : 0;
-    el.textContent = txt.length + " 字 · " + lines + " 行";
+    el.textContent = txt.length + " characters · " + lines + " lines";
     var meta = $("note-meta");
     if (n.updatedAt) {
-      meta.textContent = "更新于 " + fmtTime(n.updatedAt);
-      meta.title = "最后更新：" + new Date(n.updatedAt).toLocaleString("zh-CN");
+      meta.textContent = "Updated " + fmtTime(n.updatedAt);
+      meta.title = "Last updated: " + new Date(n.updatedAt).toLocaleString("en-US");
     } else {
       meta.textContent = "";
     }
@@ -660,7 +660,7 @@
       var sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
       function p2(x) { return (x < 10 ? "0" : "") + x; }
       if (sameDay) { return p2(d.getHours()) + ":" + p2(d.getMinutes()); }
-      return (d.getMonth() + 1) + "月" + d.getDate() + "日 " + p2(d.getHours()) + ":" + p2(d.getMinutes());
+      return d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + p2(d.getHours()) + ":" + p2(d.getMinutes());
     } catch (e) { return ""; }
   }
 
@@ -677,19 +677,19 @@
 
   // ---------------- 存储状态 ----------------
   var STATUS_TEXT = {
-    host: "已保存到 DBX 插件空间",
-    folder: "已保存到本地目录",
-    local: "已保存到浏览器本地存储",
-    session: "仅临时保存（关闭后丢失）",
-    memory: "仅在内存中（未持久化）",
-    sidecar: "已保存到存储目录"
+    host: "Saved to DBX plugin storage",
+    folder: "Saved to a local folder",
+    local: "Saved to browser storage",
+    session: "Saved temporarily (lost when closed)",
+    memory: "In memory only (not saved)",
+    sidecar: "Saved to the storage directory"
   };
   function renderStatus(st) {
     st = S.status();   // 必须现取副本：onStatus 回调传的是内部 status 对象（没有 .diag 等派生字段）
     var pill = $("store-status");
     var dot = pill ? pill.querySelector(".store-dot") : null;
     var text = $("store-text");
-    if (!dot || !text) { S.log("渲染状态栏", false, "状态栏 DOM 缺失（#store-status / #store-text）"); return; }
+    if (!dot || !text) { S.log("Render storage status", false, "Status elements missing (#store-status / #store-text)"); return; }
 
     var unconfigured = (st.backend === "sidecar" && st.dirConfigured === false);
     var bad = !st.ok || !st.persistent;
@@ -697,21 +697,21 @@
     if (unconfigured) { cls = "warn"; }
     dot.className = "store-dot " + cls;
 
-    var label = STATUS_TEXT[st.backend] || ("存储：" + st.backend);
-    if (st.backend === "sidecar" && st.storageDir) { label += "：" + st.storageDir; }
-    if (st.backend === "folder" && st.folderName) { label += "：" + st.folderName; }
-    if (!st.ok && st.lastError) { label += "（写入失败：" + st.lastError + "）"; }
+    var label = STATUS_TEXT[st.backend] || ("Storage: " + st.backend);
+    if (st.backend === "sidecar" && st.storageDir) { label += ": " + st.storageDir; }
+    if (st.backend === "folder" && st.folderName) { label += ": " + st.folderName; }
+    if (!st.ok && st.lastError) { label += " (write failed: " + st.lastError + ")"; }
     if (unconfigured) {
-      var where = st.storageDir || st.storagePath || "插件默认目录";
-      label = "未配置存储目录：笔记暂存于 " + where;
+      var where = st.storageDir || st.storagePath || "the plugin's default directory";
+      label = "Storage directory not configured: notes are temporarily stored in " + where;
     }
     text.textContent = label;
     // 异常时仅用状态条颜色 + title 提示，不再弹干扰性横幅
     pill.title = unconfigured
-      ? "未配置「笔记存储目录」：笔记当前保存在 " + (st.storageDir || st.storagePath || "插件默认目录") +
-        "。请在连接设置里填写「笔记存储目录」后重新连接，笔记才会落到你指定的文件夹。"
-      : (bad ? "存储异常：" + (st.lastError || "未持久化")
-             : "已持久化保存" + (st.storageDir ? "（" + st.storageDir + "）" : ""));
+      ? "Notes storage directory not configured: notes are currently saved in " + (st.storageDir || st.storagePath || "the plugin's default directory") +
+        ". Set the notes storage directory in connection settings and reconnect to save them in your chosen folder."
+      : (bad ? "Storage error: " + (st.lastError || "not persisted")
+             : "Saved persistently" + (st.storageDir ? " (" + st.storageDir + ")" : ""));
   }
 
   /* ============ 页面置顶诊断条（上线默认关闭，保留代码便于排障） ============
@@ -742,23 +742,23 @@
 
   function verdictText(st) {
     if (!st.hostAvailable) {
-      return "笔记不会落盘：未检测到 dbxPlugin 桥接（当前可能不在 DBX 插件工作台内）";
+      return "Notes will not be saved to disk: dbxPlugin bridge not found (you may be outside the DBX plugin workspace)";
     }
     if (st.backend === "unknown") {
-      return "存储初始化尚未完成 —— 请看下方日志的最后一行，那里就是卡住的位置";
+      return "Storage initialization is still pending. Check the last log entry below to see where it stopped.";
     }
     if (st.backend === "sidecar") {
-      var where = st.storageDir || st.storagePath || "插件默认目录";
+      var where = st.storageDir || st.storagePath || "the plugin's default directory";
       if (st.ok && st.persistent) {
         return st.dirConfigured === false
-          ? "笔记已落盘，但未配置「笔记存储目录」，实际写入：" + where
-          : "笔记正在落盘到：" + where;
+          ? "Notes are saved to disk, but no notes storage directory is configured. Actual location: " + where
+          : "Notes are being saved to: " + where;
       }
-      return "笔记不会落盘：" + (st.lastError || "侧车写入异常");
+      return "Notes will not be saved to disk: " + (st.lastError || "sidecar write error");
     }
-    if (st.sidecarError) { return "笔记不会落盘：" + st.sidecarError; }
-    if (st.lastError) { return "笔记不会落盘：" + st.lastError; }
-    return "笔记当前不会落盘（后端：" + st.backend + "）";
+    if (st.sidecarError) { return "Notes will not be saved to disk: " + st.sidecarError; }
+    if (st.lastError) { return "Notes will not be saved to disk: " + st.lastError; }
+    return "Notes are not being saved to disk (backend: " + st.backend + ")";
   }
 
   function renderDiag() {
@@ -775,22 +775,22 @@
 
     var parts = [
       "UI v" + (S.VERSION || "?"),
-      "后端 " + st.backend,
-      st.persistent ? "可持久化" : "不可持久化",
-      "桥接 " + (st.hostAvailable ? "已连接" : "缺失"),
-      "侧车 " + (st.sidecarAvailable ? "已握手" : "未握手"),
-      "目录 " + (st.storageDir || "未读到")
+      "Backend " + st.backend,
+      st.persistent ? "Persistent" : "Not persistent",
+      "Bridge " + (st.hostAvailable ? "connected" : "missing"),
+      "Sidecar " + (st.sidecarAvailable ? "connected" : "not connected"),
+      "Directory " + (st.storageDir || "unavailable")
     ];
-    if (st.connectionId) { parts.push("连接 " + st.connectionId); }
-    if (st.payloadBytes) { parts.push("上次负载 " + Math.round(st.payloadBytes / 1024) + "KB"); }
-    if (st.lastSavedAt) { parts.push("上次写入 " + new Date(st.lastSavedAt).toLocaleTimeString("zh-CN")); }
-    if (st.lastError) { parts.push("错误 " + st.lastError); }
+    if (st.connectionId) { parts.push("Connection " + st.connectionId); }
+    if (st.payloadBytes) { parts.push("Last payload " + Math.round(st.payloadBytes / 1024) + " KB"); }
+    if (st.lastSavedAt) { parts.push("Last write " + new Date(st.lastSavedAt).toLocaleTimeString("en-US")); }
+    if (st.lastError) { parts.push("Error " + st.lastError); }
     var s = $("diag-summary");
     if (s) { s.textContent = parts.join(" · "); }
 
     var log = $("diag-log");
     if (log) {
-      log.textContent = (st.diag && st.diag.length) ? st.diag.join("\n") : "（暂无日志）";
+      log.textContent = (st.diag && st.diag.length) ? st.diag.join("\n") : "(No logs yet)";
       log.scrollTop = log.scrollHeight;
     }
     // 默认展开；一旦出现严重问题（bad）强制再展开一次，保证故障不会被折叠藏起来
@@ -798,28 +798,28 @@
     diagLastSev = sev;
     if (log) { log.hidden = !diagOpen; }
     var btn = $("diag-toggle");
-    if (btn) { btn.textContent = diagOpen ? "收起日志" : "展开日志"; }
+    if (btn) { btn.textContent = diagOpen ? "Hide logs" : "Show logs"; }
   }
 
   function openStoreModal() {
     var st = S.status();
     var lines = [
-      "后端：" + st.backend
-        + (st.backend === "folder" && st.folderName ? "（" + st.folderName + "）" : ""),
-      "可持久化：" + (st.persistent ? "是" : "否"),
-      "宿主桥接：" + (st.hostAvailable ? "已连接" : "不存在"),
-      "侧车进程：" + (st.sidecarAvailable ? "已握手" : ("不可用 —— " + (st.sidecarError || "未知原因"))),
-      "连接 ID：" + (st.connectionId || "（未读到）"),
-      "实际落盘目录：" + (st.storageDir || "（未读到）"),
-      "数据文件：" + (st.storagePath || "（尚未写入）"),
-      "目录已配置：" + (st.dirConfigured ? "是" : "否（写入插件默认目录）"),
-      "前端目录授权：" + (st.fsSupported ? "支持" : "不支持（沙箱内不可用，需走侧车）"),
-      "最近写入：" + (st.lastSavedAt ? new Date(st.lastSavedAt).toLocaleString("zh-CN") : "尚无"),
-      "最近负载：" + (st.payloadBytes ? Math.round(st.payloadBytes / 1024) + " KB" : "（尚无）"),
-      "错误：" + (st.lastError || "无")
+      "Backend: " + st.backend
+        + (st.backend === "folder" && st.folderName ? " (" + st.folderName + ")" : ""),
+      "Persistent: " + (st.persistent ? "Yes" : "No"),
+      "Host bridge: " + (st.hostAvailable ? "Connected" : "Missing"),
+      "Sidecar: " + (st.sidecarAvailable ? "Connected" : ("Unavailable — " + (st.sidecarError || "unknown reason"))),
+      "Connection ID: " + (st.connectionId || "(Unavailable)"),
+      "Storage directory: " + (st.storageDir || "(Unavailable)"),
+      "Data file: " + (st.storagePath || "(Not written yet)"),
+      "Directory configured: " + (st.dirConfigured ? "Yes" : "No (using the plugin's default directory)"),
+      "Browser folder access: " + (st.fsSupported ? "Available" : "Unavailable (sandboxed; requires the sidecar)"),
+      "Last write: " + (st.lastSavedAt ? new Date(st.lastSavedAt).toLocaleString("en-US") : "None"),
+      "Last payload: " + (st.payloadBytes ? Math.round(st.payloadBytes / 1024) + " KB" : "(None)"),
+      "Error: " + (st.lastError || "None")
     ];
     openModal(function (card) {
-      var h = document.createElement("h3"); h.textContent = "存储状态"; card.appendChild(h);
+      var h = document.createElement("h3"); h.textContent = "Storage status"; card.appendChild(h);
       var p = document.createElement("pre");
       p.className = "m-pre";
       p.textContent = lines.join("\n");
@@ -832,23 +832,23 @@
         det.className = "m-diag";
         det.open = !st.persistent;   // 有问题默认展开
         var sum = document.createElement("summary");
-        sum.textContent = "存储诊断日志（" + ((st.diag && st.diag.length) || 0) + " 条，排查用）";
+        sum.textContent = "Storage diagnostic logs (" + ((st.diag && st.diag.length) || 0) + " entries)";
         det.appendChild(sum);
         var pre = document.createElement("pre");
         pre.className = "m-pre";
-        pre.textContent = (st.diag && st.diag.length) ? st.diag.join("\n") : "（无）";
+        pre.textContent = (st.diag && st.diag.length) ? st.diag.join("\n") : "(None)";
         det.appendChild(pre);
         card.appendChild(det);
       }
 
       var acts = [];
       if (st.fsSupported) {
-        acts.push({ text: "选择笔记目录…", onClick: function () { closeModal(); chooseDirFlow(); } });
+        acts.push({ text: "Choose notes folder…", onClick: function () { closeModal(); chooseDirFlow(); } });
       }
-      acts.push({ text: "复制诊断报告", onClick: function () { copyText(S.report(), "诊断报告"); } });
-      acts.push({ text: "立即备份", onClick: function () { closeModal(); backupAll(); } });
-      acts.push({ text: "从备份恢复…", onClick: function () { closeModal(); restoreFlow(); } });
-      acts.push({ text: "关闭", primary: true, onClick: closeModal });
+      acts.push({ text: "Copy diagnostic report", onClick: function () { copyText(S.report(), "diagnostic report"); } });
+      acts.push({ text: "Back up now", onClick: function () { closeModal(); backupAll(); } });
+      acts.push({ text: "Restore from backup…", onClick: function () { closeModal(); restoreFlow(); } });
+      acts.push({ text: "Close", primary: true, onClick: closeModal });
       modalButtons(card, acts);
     });
   }
@@ -868,8 +868,8 @@
 
     var stat = document.createElement("div");
     stat.className = "foot-stat";
-    stat.innerHTML = '<span class="foot-num">' + totalNotes + '</span> 篇笔记 · ' +
-      '<span class="foot-num">' + totalFolders + '</span> 个文件夹';
+    stat.innerHTML = '<span class="foot-num">' + totalNotes + '</span> notes · ' +
+      '<span class="foot-num">' + totalFolders + '</span> folders';
     foot.appendChild(stat);
 
     // 未配置 storage_dir 时给出醒目提示：笔记其实写进了插件默认目录，用户看不到 → 误以为没存储。
@@ -877,8 +877,8 @@
     if (st.backend === "sidecar" && st.dirConfigured === false) {
       var warn = document.createElement("div");
       warn.className = "foot-warn";
-      warn.textContent = "未配置「笔记存储目录」：笔记暂存在插件默认目录，在你自己的文件夹里看不到。"
-        + "请在连接设置里填写后重新连接（点状态栏可看详情）。";
+      warn.textContent = "Notes storage directory is not configured. Notes are temporarily stored in the plugin's default directory, not your chosen folder. "
+        + "Set the directory in connection settings and reconnect (click the status bar for details).";
       foot.appendChild(warn);
     }
   }
@@ -887,17 +887,17 @@
   function chooseDirFlow() {
     S.pickDirectory().then(function (r) {
       if (!r.ok) {
-        toast(r.error || "无法选择目录", "warn");
+        toast(r.error || "Could not choose a folder", "warn");
         return null;
       }
       return S.reload().then(function (data) {
         if (applyLoaded(data) && state.nodes.length) {
           render();
           persist(false);
-          toast("已载入本地目录中的笔记：" + r.name);
+          toast("Loaded notes from local folder: " + r.name);
         } else {
           persist(false);
-          toast("笔记将保存到本地目录：" + r.name);
+          toast("Notes will be saved to local folder: " + r.name);
         }
         renderStatus();
       });
@@ -925,7 +925,7 @@
 
   function createNote(name, parentId, content) {
     var n = {
-      id: uid(), type: "note", name: uniqueName(parentId, name || "未命名笔记"),
+      id: uid(), type: "note", name: uniqueName(parentId, name || "Untitled note"),
       parentId: parentId || null, content: content == null ? "" : content,
       createdAt: nowISO(), updatedAt: nowISO()
     };
@@ -939,7 +939,7 @@
 
   function createFolder(name, parentId) {
     var f = {
-      id: uid(), type: "folder", name: uniqueName(parentId, name || "新建文件夹"),
+      id: uid(), type: "folder", name: uniqueName(parentId, name || "New folder"),
       parentId: parentId || null, createdAt: nowISO(), updatedAt: nowISO()
     };
     state.nodes.push(f);
@@ -951,23 +951,23 @@
   }
 
   function renameNode(n) {
-    promptModal("重命名", n.type === "folder" ? "文件夹名称" : "笔记标题", n.name, "保存").then(function (v) {
+    promptModal("Rename", n.type === "folder" ? "Folder name" : "Note title", n.name, "Save").then(function (v) {
       if (!v) { return; }
       var finalName = uniqueName(n.parentId, v, n.id);
       n.name = finalName;
       n.updatedAt = nowISO();
       persist(false);
       render();
-      toast("已重命名");
+      toast("Renamed");
     });
   }
 
   function removeNode(n) {
-    var extra = n.type === "folder" ? (countNotes(n.id) + " 条笔记") : "";
+    var extra = n.type === "folder" ? (countNotes(n.id) + " notes") : "";
     confirmModal(
-      "删除" + (n.type === "folder" ? "文件夹" : "笔记"),
-      "确定删除「" + n.name + "」" + (extra ? "及其中的 " + extra : "") + "？此操作不可撤销。",
-      "删除", true
+      "Delete " + (n.type === "folder" ? "folder" : "note"),
+      "Delete “" + n.name + "”" + (extra ? " and its " + extra : "") + "? This cannot be undone.",
+      "Delete", true
     ).then(function (ok) {
       if (!ok) { return; }
       var kill = {};
@@ -982,7 +982,7 @@
       if (kill[state.activeId]) { state.activeId = null; }
       persist(false);
       render();
-      toast("已删除");
+      toast("Deleted");
     });
   }
 
@@ -993,7 +993,7 @@
     if ((n.parentId || null) === destId) { return; }
     if (n.type === "folder") {
       if (destId === n.id || isDescendant(destId, n.id)) {
-        toast("不能把文件夹移动到它自己或它的子文件夹里", "warn");
+        toast("A folder cannot be moved into itself or one of its subfolders", "warn");
         return;
       }
     }
@@ -1003,7 +1003,7 @@
     if (destId) { state.expanded[destId] = true; }
     persist(false);
     render();
-    toast("已移动到「" + (destId ? byId(destId).name : "根目录") + "」");
+    toast("Moved to “" + (destId ? byId(destId).name : "Root") + "”");
   }
 
   // ---------------- 右键菜单 ----------------
@@ -1026,28 +1026,28 @@
     }
 
     if (!n) {
-      item("新建笔记", function () { createNote("未命名笔记", null, ""); });
-      item("新建文件夹", function () { newFolderFlow(null); });
-      if (ENABLE_IMPORT) { item("导入 .md 文件", pickImportFiles); }
-      item("备份全部为 zip", backupAll);
-      item("从备份恢复…", restoreFlow);
+      item("New note", function () { createNote("Untitled note", null, ""); });
+      item("New folder", function () { newFolderFlow(null); });
+      if (ENABLE_IMPORT) { item("Import .md files", pickImportFiles); }
+      item("Back up all notes as zip", backupAll);
+      item("Restore from backup…", restoreFlow);
     } else if (n.type === "folder") {
-      item("新建笔记", function () { createNote("未命名笔记", n.id, ""); });
-      item("新建子文件夹", function () { newFolderFlow(n.id); });
-      item("重命名", function () { renameNode(n); });
-      item("移动到…", function () { moveNodeFlow(n); });
-      item("导出此文件夹为 zip", function () { exportFolder(n); });
-      item("删除文件夹", function () { removeNode(n); }, true);
+      item("New note", function () { createNote("Untitled note", n.id, ""); });
+      item("New subfolder", function () { newFolderFlow(n.id); });
+      item("Rename", function () { renameNode(n); });
+      item("Move to…", function () { moveNodeFlow(n); });
+      item("Export folder as zip", function () { exportFolder(n); });
+      item("Delete folder", function () { removeNode(n); }, true);
     } else {
-      item("重命名", function () { renameNode(n); });
-      item("移动到…", function () { moveNodeFlow(n); });
-      item("AI 分析", function () { openAIPanel("analyze"); });
-      item("AI 润色", function () { openAIPanel("polish"); });
-      item("AI 续写", function () { openAIPanel("continue"); });
-      item("问 AI", function () { openAIPanel("ask"); });
-      item("导出 .md", function () { exportNote(n); });
-      item("复制正文", function () { copyText(n.content || "", "笔记正文"); });
-      item("删除笔记", function () { removeNode(n); }, true);
+      item("Rename", function () { renameNode(n); });
+      item("Move to…", function () { moveNodeFlow(n); });
+      item("AI analysis", function () { openAIPanel("analyze"); });
+      item("AI polish", function () { openAIPanel("polish"); });
+      item("AI continue", function () { openAIPanel("continue"); });
+      item("Ask AI", function () { openAIPanel("ask"); });
+      item("Export .md", function () { exportNote(n); });
+      item("Copy content", function () { copyText(n.content || "", "note content"); });
+      item("Delete note", function () { removeNode(n); }, true);
     }
 
     var w = m.offsetWidth || 168, h = m.offsetHeight || 180;
@@ -1066,7 +1066,7 @@
     });
   }
   function newFolderFlow(parentId) {
-    promptModal("新建文件夹", "文件夹名称", "新建文件夹", "创建").then(function (v) {
+    promptModal("New folder", "Folder name", "New folder", "Create").then(function (v) {
       if (v) { createFolder(v, parentId); }
     });
   }
@@ -1107,49 +1107,49 @@
   function saveViaSidecar(method, params, what, linesFn) {
     if (!S.hasHostSave()) {
       return S.invoke(method, merge(params, { toDisk: true })).then(function (d) {
-        showPathModal("已" + what + "到笔记存储目录", d.path);
+        showPathModal(what + " saved to the notes storage directory", d.path);
       }).catch(function (e) {
-        toast(what + "失败：" + (e && e.message ? e.message : e), "warn");
+        toast(what + " failed: " + (e && e.message ? e.message : e), "warn");
       });
     }
     return S.invoke(method, params).then(function (r) {
       var name = r.fileName || ("md-notes" + (method.indexOf("backup") >= 0 ? ".zip" : ".md"));
       return S.saveFile(name, mimeOf(name), r.dataBase64).then(function (res) {
-        if (res.canceled) { toast("已取消" + what); return; }
-        if (res.ok) { showSavedModal("已" + what, res.path || name, linesFn ? linesFn(r) : null); return; }
-        toast("「另存为」不可用（" + res.error + "），改为写入笔记存储目录", "warn");
+        if (res.canceled) { toast(what + " canceled"); return; }
+        if (res.ok) { showSavedModal(what + " saved", res.path || name, linesFn ? linesFn(r) : null); return; }
+        toast("Save As unavailable (" + res.error + "); saving to the notes storage directory instead", "warn");
         return S.invoke(method, merge(params, { toDisk: true })).then(function (d) {
-          showPathModal("已" + what + "到笔记存储目录", d.path);
+          showPathModal(what + " saved to the notes storage directory", d.path);
         });
       });
     }).catch(function (e) {
-      toast(what + "失败：" + (e && e.message ? e.message : e), "warn");
+      toast(what + " failed: " + (e && e.message ? e.message : e), "warn");
     });
   }
 
   function exportNote(n) {
-    if (!n) { toast("请先选择一条笔记", "warn"); return; }
-    return saveViaSidecar("notes/exportNote", { id: n.id }, "导出笔记");
+    if (!n) { toast("Select a note first", "warn"); return; }
+    return saveViaSidecar("notes/exportNote", { id: n.id }, "Note export");
   }
   function exportFolder(folder) {
-    if (!folder) { toast("请先选择一个文件夹", "warn"); return; }
-    return saveViaSidecar("notes/backup", { scope: folder.id }, "备份文件夹", backupLines);
+    if (!folder) { toast("Select a folder first", "warn"); return; }
+    return saveViaSidecar("notes/backup", { scope: folder.id }, "Folder backup", backupLines);
   }
   function backupAll() {
-    return saveViaSidecar("notes/backup", {}, "备份全部笔记", backupLines);
+    return saveViaSidecar("notes/backup", {}, "Full notes backup", backupLines);
   }
 
   /** 备份成功后把「包里装了什么」摊开说 —— 「含配置」必须看得见，否则没人知道它能用来恢复。 */
   function backupLines(r) {
     var lines = [
-      "包含：" + (r.count || 0) + " 篇笔记 · " + (r.folders || 0) + " 个文件夹",
-      "已含配置：mdnotes-backup.json（版本 / 导出时间 / 原存储目录）",
-      "　　　　　.mdnotes/meta.json（目录树索引，恢复出层级和标题靠它）",
-      "包体积：" + fmtBytes(r.bytes)
+      "Contents: " + (r.count || 0) + " notes · " + (r.folders || 0) + " folders",
+      "Includes configuration: mdnotes-backup.json (version / export time / original storage directory)",
+      "                        .mdnotes/meta.json (folder tree, hierarchy, and titles)",
+      "Backup size: " + fmtBytes(r.bytes)
     ];
-    if (r.storageDir) { lines.push("原存储目录：" + r.storageDir); }
+    if (r.storageDir) { lines.push("Original storage directory: " + r.storageDir); }
     lines.push("");
-    lines.push("要恢复：工具栏「恢复备份…」选中这个 zip 即可。");
+    lines.push("To restore, select this zip with “Restore backup…” in the toolbar.");
     return lines;
   }
 
@@ -1159,7 +1159,7 @@
       var h = document.createElement("h3"); h.textContent = title; card.appendChild(h);
       var p = document.createElement("p");
       p.className = "m-msg";
-      p.textContent = "已保存到你选择的目录：";
+      p.textContent = "Saved to your chosen folder:";
       card.appendChild(p);
       var ta = document.createElement("textarea");
       ta.className = "m-text";
@@ -1173,9 +1173,9 @@
         card.appendChild(pre);
       }
       var acts = [];
-      if (path) { acts.push({ text: "复制路径", onClick: function () { copyText(path, "文件路径"); } }); }
+      if (path) { acts.push({ text: "Copy path", onClick: function () { copyText(path, "file path"); } }); }
       (actions || []).forEach(function (a) { acts.push(a); });
-      acts.push({ text: "关闭", primary: !actions || !actions.length, onClick: closeModal });
+      acts.push({ text: "Close", primary: !actions || !actions.length, onClick: closeModal });
       modalButtons(card, acts);
     });
   }
@@ -1185,7 +1185,7 @@
       var h = document.createElement("h3"); h.textContent = title; card.appendChild(h);
       var p = document.createElement("p");
       p.className = "m-msg";
-      p.textContent = "文件已生成到你的笔记存储目录：";
+      p.textContent = "File created in your notes storage directory:";
       card.appendChild(p);
       var ta = document.createElement("textarea");
       ta.className = "m-text";
@@ -1193,8 +1193,8 @@
       ta.readOnly = true;
       card.appendChild(ta);
       modalButtons(card, [
-        { text: "关闭", onClick: closeModal },
-        { text: "复制路径", primary: true, onClick: function () { copyText(path, "导出路径"); } }
+        { text: "Close", onClick: closeModal },
+        { text: "Copy path", primary: true, onClick: function () { copyText(path, "export path"); } }
       ]);
     });
   }
@@ -1217,8 +1217,8 @@
         pre.textContent = (lines || []).join("\n");
         card.appendChild(pre);
         modalButtons(card, [
-          { text: "取消", onClick: function () { done(false); } },
-          { text: okText || "确定", primary: true, onClick: function () { done(true); } }
+          { text: "Cancel", onClick: function () { done(false); } },
+          { text: okText || "OK", primary: true, onClick: function () { done(true); } }
         ]);
       });
     });
@@ -1228,7 +1228,7 @@
 
   function restoreFlow() {
     var inp = $("backup-input");
-    if (!inp) { toast("恢复入口不可用", "warn"); return; }
+    if (!inp) { toast("Restore option unavailable", "warn"); return; }
     inp.value = "";
     inp.click();
   }
@@ -1239,8 +1239,8 @@
     // 宿主对 request 参数有 2 MiB 上限，base64 之后能带上行的 zip 约 1.5 MB。
     // 超过就明确拒绝并给替代方案，而不是让它失败在一个看不懂的报错上。
     if (f.size > S.MAX_UPSTREAM_BYTES) {
-      toast("备份包太大（" + fmtBytes(f.size) + " > 上限 " + fmtBytes(S.MAX_UPSTREAM_BYTES)
-        + "）：请手动解压后把 .md 放回存储目录", "warn");
+      toast("Backup is too large (" + fmtBytes(f.size) + " > limit " + fmtBytes(S.MAX_UPSTREAM_BYTES)
+        + "). Extract it manually and place the .md files in the storage directory.", "warn");
       return;
     }
     var b64 = "";
@@ -1250,19 +1250,19 @@
     }).then(function (r) {
       var bi = r.backup || {};
       var lines = [
-        "备份文件：" + f.name + "（" + fmtBytes(f.size) + "）",
-        "备份时间：" + (bi.exportedAt || "（未记录）"),
-        "插件版本：" + (bi.version || "（未记录）"),
-        "备份时存储目录：" + (bi.storageDir || "（未记录）"),
-        "包含：" + r.notes + " 篇笔记 · " + r.folders + " 个文件夹",
+        "Backup file: " + f.name + " (" + fmtBytes(f.size) + ")",
+        "Backup date: " + (bi.exportedAt || "(Not recorded)"),
+        "Plugin version: " + (bi.version || "(Not recorded)"),
+        "Storage directory at backup time: " + (bi.storageDir || "(Not recorded)"),
+        "Contents: " + r.notes + " notes · " + r.folders + " folders",
         "",
-        "将写入当前存储目录：" + r.storageDir,
-        "同名笔记会被覆盖，目录树索引会被替换为备份时的状态。",
-        "恢复前会自动另存一份 pre-restore-*.zip 作为退路。"
+        "Restore into current storage directory: " + r.storageDir,
+        "Notes with matching names will be overwritten, and the folder tree will revert to its backed-up state.",
+        "A pre-restore-*.zip safety backup will be created automatically."
       ];
-      return confirmListModal("确认恢复？", lines, "开始恢复");
+      return confirmListModal("Restore this backup?", lines, "Restore now");
     }).then(function (ok) {
-      if (!ok) { toast("已取消恢复"); return null; }
+      if (!ok) { toast("Restore canceled"); return null; }
       // 恢复前先把挂起的防抖写落定，避免「恢复完成」之后又被那一帧旧快照覆盖。
       return S.flush().then(function () {
         return S.invoke("notes/restore", { dataBase64: b64 });
@@ -1272,24 +1272,24 @@
           render();
           persist(false);
           var lines = [
-            "已恢复 " + r.notes + " 篇笔记 · " + r.folders + " 个文件夹",
-            "存储目录：" + r.storageDir
+            "Restored " + r.notes + " notes · " + r.folders + " folders",
+            "Storage directory: " + r.storageDir
           ];
           lines.push(r.safetyPath
-            ? ("恢复前的快照（退路）：" + r.safetyPath)
-            : "（恢复前没有笔记，无需快照）");
-          showSavedModal("恢复完成", r.storageDir, lines);
+            ? ("Pre-restore safety backup: " + r.safetyPath)
+            : "(There were no notes to back up before restoration)");
+          showSavedModal("Restore complete", r.storageDir, lines);
         });
       });
     }).catch(function (e) {
-      toast("恢复失败：" + (e && e.message ? e.message : e), "warn");
+      toast("Restore failed: " + (e && e.message ? e.message : e), "warn");
     });
   }
   /** 打开「导入 .md」的文件选择框。导入功能下线时不会走到这里；
    *  取元素用安全写法（先赋值再判空），避免元素缺失时抛错把调用方连坐。 */
   function pickImportFiles() {
     var fi = $("file-input");
-    if (fi) { fi.click(); } else { toast("导入功能已停用", "warn"); }
+    if (fi) { fi.click(); } else { toast("Import is disabled", "warn"); }
   }
 
   function handleImport(files) {
@@ -1306,7 +1306,7 @@
         createNote(it.name, parentId, it.text);
         n++;
       });
-      toast(n ? ("已导入 " + n + " 条笔记") : "没有可导入的 .md 文件", n ? "" : "warn");
+      toast(n ? ("Imported " + n + " notes") : "No importable .md files found", n ? "" : "warn");
     });
   }
   function copyText(text, what) {
@@ -1322,7 +1322,7 @@
       document.body.removeChild(ta);
       return ok;
     }
-    var done = function (ok) { toast(ok ? ("已复制" + (what ? "（" + what + "）" : "")) : "复制失败，请手动选择复制", ok ? "" : "warn"); };
+    var done = function (ok) { toast(ok ? ("Copied" + (what ? " (" + what + ")" : "")) : "Copy failed. Select and copy manually.", ok ? "" : "warn"); };
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(function () { done(true); }).catch(function () { done(fallback()); });
     } else {
@@ -1340,31 +1340,31 @@
   }
   function tableMarkdown(table, fields) {
     var L = [];
-    L.push("# 表设计笔记：" + table);
+    L.push("# Table design notes: " + table);
     L.push("");
-    L.push("> 创建于 " + new Date().toLocaleString("zh-CN"));
+    L.push("> Created on " + new Date().toLocaleString("en-US"));
     L.push("");
-    L.push("## 字段清单");
+    L.push("## Columns");
     L.push("");
     if (fields.length) {
-      L.push("| 列名 | 类型 | 说明 |");
+      L.push("| Column | Type | Description |");
       L.push("| --- | --- | --- |");
       fields.forEach(function (f) { L.push("| " + f.name + " | " + (f.type || "") + " |  |"); });
     } else {
-      L.push("（未提供字段清单）");
+      L.push("(No columns provided)");
     }
     L.push("");
-    L.push("## 设计说明");
+    L.push("## Design notes");
     L.push("");
-    L.push("- 主键 / 唯一键：");
-    L.push("- 索引设计：");
-    L.push("- 数据量级与增长：");
+    L.push("- Primary / unique keys:");
+    L.push("- Index design:");
+    L.push("- Data volume and growth:");
     L.push("");
-    L.push("## 踩坑记录");
+    L.push("## Lessons learned");
     L.push("");
     L.push("- ");
     L.push("");
-    L.push("## SQL 心得");
+    L.push("## SQL tips");
     L.push("");
     L.push("```sql");
     var cols = fields.length ? fields.slice(0, 6).map(function (f) { return f.name; }).join(", ") : "*";
@@ -1394,12 +1394,12 @@
   function closeTableModal() { $("table-modal").hidden = true; }
   function submitTableModal() {
     var table = String($("tn-table").value || "").trim();
-    if (!table) { toast("请填写表名", "warn"); return; }
+    if (!table) { toast("Enter a table name", "warn"); return; }
     var fields = parseFields($("tn-fields").value);
     var parent = $("tn-folder").value || null;
     closeTableModal();
-    createNote("表设计：" + table, parent, tableMarkdown(table, fields));
-    toast("已为「" + table + "」创建笔记");
+    createNote("Table design: " + table, parent, tableMarkdown(table, fields));
+    toast("Created note for “" + table + "”");
   }
 
   /** 从宿主传入的上下文自动建笔记（右键「为此表新建笔记」） */
@@ -1423,25 +1423,25 @@
       return (c.name || c.column || "") + (c.type ? " " + c.type : "");
     }).filter(Boolean).join("\n");
 
-    var title = "表设计：" + table;
-    var exist = state.nodes.filter(function (n) { return n.type === "note" && n.name === title; })[0];
+    var title = "Table design: " + table;
+    var exist = state.nodes.filter(function (n) { return n.type === "note" && (n.name === title || n.name === ("表设计：" + table)); })[0];
     if (exist) {
       state.activeId = exist.id;
       persist(false);
       render();
-      toast("已打开已有笔记：" + title);
+      toast("Opened existing note: " + (exist.name || title));
       return;
     }
     createNote(title, null, tableMarkdown(table, parseFields(fieldsText)));
-    toast("已为「" + table + "」创建笔记");
+    toast("Created note for “" + table + "”");
   }
 
   function insertSqlBlock() {
     var n = activeNote();
-    if (!n) { toast("请先选择一条笔记", "warn"); return; }
+    if (!n) { toast("Select a note first", "warn"); return; }
     var ta = $("editor");
     var table = "";
-    var m = String(n.name || "").match(/表设计[：:]\s*(.+)$/);
+    var m = String(n.name || "").match(/(?:Table design|表设计)[：:]\s*(.+)$/i);
     if (m) { table = m[1].trim(); }
     var block = "\n```sql\nSELECT *\nFROM " + (table || "your_table") + "\nLIMIT 100;\n```\n";
     var start = ta.selectionStart == null ? ta.value.length : ta.selectionStart;
@@ -1468,37 +1468,37 @@
     var sel = ta.value.slice(ta.selectionStart || 0, ta.selectionEnd || 0);
     var sql = sel.trim() ? sel.trim() : firstSqlBlock(ta.value);
     if (!sql) { sql = ta.value; }
-    if (!String(sql).trim()) { toast("没有可复制的 SQL", "warn"); return; }
-    copyText(sql, "SQL，可直接粘贴到 DBX SQL 编辑器");
+    if (!String(sql).trim()) { toast("No SQL to copy", "warn"); return; }
+    copyText(sql, "SQL (ready to paste into DBX SQL editor)");
   }
 
   // ---------------- 初始化示例（仅在完全没有数据时） ----------------
   function seed() {
     var welcome =
-      "# 欢迎使用 AI.MD 笔记\n\n" +
-      "这是你的第一篇笔记。左侧是目录树，右侧是编辑器与实时预览。\n\n" +
-      "## 支持的语法\n\n" +
-      "- 标题、列表、**加粗**、*斜体*、`行内代码`\n" +
-      "- > 引用\n\n" +
-      "| 列名 | 类型 | 说明 |\n" +
+      "# Welcome to AI.MD Notes\n\n" +
+      "This is your first note. The folder tree is on the left; the editor and live preview are on the right.\n\n" +
+      "## Supported syntax\n\n" +
+      "- Headings, lists, **bold**, *italic*, `inline code`\n" +
+      "- > Blockquotes\n\n" +
+      "| Column | Type | Description |\n" +
       "| --- | --- | --- |\n" +
-      "| id | bigint | 主键 |\n\n" +
-      "## SQL 代码块（自动高亮）\n\n" +
+      "| id | bigint | Primary key |\n\n" +
+      "## SQL code blocks (highlighted automatically)\n\n" +
       "```sql\nSELECT id, name\nFROM users\nWHERE created_at >= '2026-01-01'\nORDER BY id DESC\nLIMIT 100;\n```\n\n" +
-      "> 提示：右上角「复制 SQL 到 DBX」会提取第一个 ```sql 块，粘贴进原生 SQL 编辑器即可执行。\n";
+      "> Tip: “Copy SQL to DBX” in the top right extracts the first ```sql block so you can paste and run it in the native SQL editor.\n";
 
     var tips =
-      "# DBX 使用心得\n\n" +
-      "## 慢查询排查\n\n" +
-      "1. 先看执行计划\n" +
-      "2. 再确认索引是否命中\n\n" +
+      "# DBX tips\n\n" +
+      "## Troubleshooting slow queries\n\n" +
+      "1. Check the execution plan first\n" +
+      "2. Verify whether indexes are hit\n\n" +
       "```sql\nEXPLAIN SELECT * FROM orders WHERE user_id = 42;\n```\n\n" +
-      "## 踩坑\n\n" +
-      "- 大表 `COUNT(*)` 很慢，改用近似值或缓存。\n";
+      "## Lessons learned\n\n" +
+      "- `COUNT(*)` on large tables is slow; use approximations or caching instead.\n";
 
-    var f = { id: uid(), type: "folder", name: "示例", parentId: null, createdAt: nowISO(), updatedAt: nowISO() };
-    var n1 = { id: uid(), type: "note", name: "欢迎使用 AI.MD 笔记", parentId: null, content: welcome, createdAt: nowISO(), updatedAt: nowISO() };
-    var n2 = { id: uid(), type: "note", name: "DBX 使用心得", parentId: f.id, content: tips, createdAt: nowISO(), updatedAt: nowISO() };
+    var f = { id: uid(), type: "folder", name: "Examples", parentId: null, createdAt: nowISO(), updatedAt: nowISO() };
+    var n1 = { id: uid(), type: "note", name: "Welcome to AI.MD Notes", parentId: null, content: welcome, createdAt: nowISO(), updatedAt: nowISO() };
+    var n2 = { id: uid(), type: "note", name: "DBX tips", parentId: f.id, content: tips, createdAt: nowISO(), updatedAt: nowISO() };
     state.nodes = [f, n1, n2];
     state.expanded[f.id] = true;
     state.activeId = n1.id;
@@ -1518,26 +1518,26 @@
   //   「提问」退化成纯对话，「续写」退化成按你的要求自由生成（两者都要求你写下问题/要求）；
   //   「分析」「润色」的语义就是处理一份现成文本，没有正文做不了 —— 所以它们没这个标记。
   var AI_TASKS = [
-    { id: "analyze", label: "分析", hint: "总结要点、待办与矛盾之处", needsInput: false, go: "开始分析", noContext: false },
-    { id: "polish", label: "润色", hint: "保持原意与 Markdown 结构，改善表达", needsInput: true, go: "开始润色", noContext: false },
-    { id: "continue", label: "续写", hint: "在末尾接着写；没有正文时按你的要求写", needsInput: true, go: "开始续写", noContext: true },
-    { id: "ask", label: "提问", hint: "针对笔记提问；没有正文时就是纯对话", needsInput: true, go: "提问", noContext: true }
+    { id: "analyze", label: "Analyze", hint: "Summarize key points, to-dos, and inconsistencies", needsInput: false, go: "Start analysis", noContext: false },
+    { id: "polish", label: "Polish", hint: "Improve clarity while preserving meaning and Markdown structure", needsInput: true, go: "Start polish", noContext: false },
+    { id: "continue", label: "Continue", hint: "Continue writing at the end; or generate from your prompt if empty", needsInput: true, go: "Start writing", noContext: true },
+    { id: "ask", label: "Ask", hint: "Ask questions about the note; pure chat when no note content", needsInput: true, go: "Ask", noContext: true }
   ];
 
   // 两个模式（默认聊天）：
   //   聊天 —— 纯对话：只发你写的话，不带任何笔记内容；不涉及"分析对象"，也没有写回操作。
   //   创作 —— 处理笔记：出现「分析对象」与任务标签，结果带四个写回操作。
   var AI_VIEWS = [
-    { id: "chat", label: "聊天", hint: "纯对话：只发你的消息，不带笔记内容" },
-    { id: "create", label: "创作", hint: "处理笔记：可指定分析对象，结果能写回笔记" }
+    { id: "chat", label: "Chat", hint: "Conversation only: sends your message without note content" },
+    { id: "create", label: "Compose", hint: "Work with notes: analyze content and write results back to notes" }
   ];
 
   // 缺配置时给中文名，用户才知道要去填哪一项
   var AI_MISSING_LABEL = {
-    enabled: "启用 AI 功能",
-    baseUrl: "API 地址",
-    model: "模型名称",
-    apiKey: "API 密钥"
+    enabled: "Enable AI features",
+    baseUrl: "API URL",
+    model: "Model name",
+    apiKey: "API key"
   };
 
   var AI_MAX_ENTRIES = 20;   // 只留最近若干条，避免长时间使用后内存无限增长
@@ -1568,7 +1568,7 @@
   }
 
   function aiErrText(e) {
-    return (e && e.message) ? e.message : String(e || "未知错误");
+    return (e && e.message) ? e.message : String(e || "Unknown error");
   }
 
   /* ---------------- 分析对象（显式可控 + 实时刷新） ----------------
@@ -1584,10 +1584,10 @@
    *   none      —— 已清除：不发送任何正文，生成按钮禁用
    */
   var AI_TARGET_MODES = [
-    { id: "auto", label: "自动跟随", hint: "有选中就用选中，否则用整篇笔记" },
-    { id: "selection", label: "选中内容", hint: "只看编辑器里当前选中的那一段" },
-    { id: "note", label: "整篇笔记", hint: "用当前这篇笔记的全文" },
-    { id: "none", label: "清除", hint: "清除分析对象（不发送任何正文）" }
+    { id: "auto", label: "Auto", hint: "Use selection if present; otherwise use the entire note" },
+    { id: "selection", label: "Selection", hint: "Only use the text currently selected in the editor" },
+    { id: "note", label: "Full note", hint: "Use the entire content of the current note" },
+    { id: "none", label: "Clear", hint: "Clear target (do not send any note content)" }
   ];
 
   function aiTargetModeDef(id) {
@@ -1620,16 +1620,16 @@
     var ed = $("editor");
     var sel = aiSelection(ed);
     if (!n) {
-      return { note: null, mode: mode, label: "不带笔记内容", text: "", hasSelection: false,
+      return { note: null, mode: mode, label: "No note content", text: "", hasSelection: false,
         start: sel.start, end: sel.end, empty: true, noNote: true };
     }
 
     if (mode === "none") {
-      return { note: n, mode: mode, label: "不带笔记内容", text: "", hasSelection: false,
+      return { note: n, mode: mode, label: "No note content", text: "", hasSelection: false,
         start: sel.start, end: sel.end, empty: true };
     }
     if (mode === "selection" && !sel.text) {
-      return { note: n, mode: mode, label: "选中内容（当前没有选中）", text: "", hasSelection: false,
+      return { note: n, mode: mode, label: "Selection (nothing currently selected)", text: "", hasSelection: false,
         start: sel.start, end: sel.end, empty: true };
     }
     var useSel = (mode === "selection" || mode === "auto") && !!sel.text;
@@ -1637,7 +1637,7 @@
     return {
       note: n,
       mode: mode,
-      label: useSel ? "选中内容" : "整篇笔记",
+      label: useSel ? "Selection" : "Full note",
       text: text,
       hasSelection: useSel,
       start: sel.start,
@@ -1700,8 +1700,8 @@
     var input = $("aip-input");
     if (input) {
       input.placeholder = aiIsChat()
-        ? "和 AI 说点什么…"
-        : "（可选）额外要求 / 你的问题";
+        ? "Say something to AI…"
+        : "(Optional) Additional instructions / questions";
     }
   }
 
@@ -1734,7 +1734,7 @@
     }
 
     if (!tgt) {
-      line("aip-target-main", "分析对象：未选择笔记。");
+      line("aip-target-main", "Target: No note selected.");
       return;
     }
     var chars = aiCharCount(tgt.text);
@@ -1742,32 +1742,32 @@
     if (tgt.empty) {
       var why, tip;
       if (tgt.noNote) {
-        why = "未选择笔记";
-        tip = "在左侧点一条笔记即可带内容分析；不带笔记也能用「提问」或「续写」。";
+        why = "No note selected";
+        tip = "Click a note on the left to analyze its content; you can still use “Ask” or “Continue” without a note.";
       } else if (tgt.mode === "none") {
-        why = "已清除（不发送笔记正文）";
-        tip = "直接点「提问」就是纯对话，「续写」会按你的要求自由生成；想带笔记就点「整篇笔记」。";
+        why = "Cleared (no note content will be sent)";
+        tip = "Click “Ask” for chat, or “Continue” to generate from your prompt; click “Full note” to include the note.";
       } else if (tgt.mode === "selection") {
-        why = "当前没有选中内容";
-        tip = "在编辑器里划选一段即可；或点「整篇笔记」；或改用「提问」不带笔记。";
+        why = "No text selected";
+        tip = "Select text in the editor, click “Full note”, or use “Ask” without a note.";
       } else {
-        why = "这篇笔记还没有内容";
-        tip = "先写点东西；或点「清除」后直接用「提问」聊。";
+        why = "This note has no content yet";
+        tip = "Write something first, or click “Clear” and chat using “Ask”.";
       }
-      line("aip-target-main warn", "分析对象：" + why + (name ? " · 《" + name + "》" : ""));
+      line("aip-target-main warn", "Target: " + why + (name ? " · “" + name + "”" : ""));
       line("aip-target-tip", tip);
       return;
     }
-    var main = "分析对象：" + tgt.label + (name ? " · 《" + name + "》" : "") + " · " + chars + " 字";
-    if (tgt.mode === "auto") { main += "（自动跟随编辑器）"; }
-    if (chars > cap) { main += " · 超过单次上限 " + cap + "，发送时会自动截断"; }
+    var main = "Target: " + tgt.label + (name ? " · “" + name + "”" : "") + " · " + chars + " chars";
+    if (tgt.mode === "auto") { main += " (auto-following editor)"; }
+    if (chars > cap) { main += " · exceeds limit of " + cap + ", will be truncated when sent"; }
     line("aip-target-main", main);
 
     var preview = document.createElement("div");
     preview.className = "aip-target-preview";
     var head = String(tgt.text).slice(0, 160).replace(/\s+/g, " ");
     preview.textContent = head + (chars > 160 ? " …" : "");
-    preview.title = "将要发送的内容预览（前 160 字）";
+    preview.title = "Preview of content to be sent (first 160 chars)";
     box.appendChild(preview);
   }
 
@@ -1776,7 +1776,7 @@
     aiState.targetMode = def.id;
     refreshAITargetUI();
     if (def.id === "selection" && !aiSelection($("editor")).text) {
-      toast("还没有选中内容：在编辑器里划选一段即可", "warn");
+      toast("No text selected: select a section in the editor", "warn");
     }
   }
 
@@ -1807,7 +1807,7 @@
   function bindAITargetWatch() {
     var ed = $("editor");
     if (!ed || !ed.addEventListener) {
-      S.log("绑定编辑器事件（AI 对象跟随）", false, "编辑器不存在或不可用");
+      S.log("Bind editor events (AI target tracking)", false, "Editor element missing or unavailable");
       return;
     }
     ["select", "keyup", "mouseup", "focus", "input", "click"].forEach(function (ev) {
@@ -1819,7 +1819,7 @@
     var go = $("aip-go");
     if (aiIsChat()) {
       // 聊天模式：只发一句话，按钮就叫「发送」
-      if (go) { go.textContent = "发送"; }
+      if (go) { go.textContent = "Send"; }
       return;
     }
     var box = $("aip-tabs");
@@ -1839,8 +1839,8 @@
     var input = $("aip-input");
     if (input) {
       input.placeholder = (aiState.task === "ask")
-        ? "写下你的问题（必填）"
-        : "（可选）额外要求，例如：更简洁 / 保留术语";
+        ? "Enter your question (required)"
+        : "(Optional) Additional instructions, e.g. more concise / keep technical terms";
     }
   }
 
@@ -1854,13 +1854,13 @@
     var el = $("aip-model");
     if (!el) { return; }
     var c = aiState.cfg;
-    if (!c) { el.textContent = "配置读取中…"; return; }
+    if (!c) { el.textContent = "Loading configuration…"; return; }
     if (!c.ready) {
-      el.textContent = "未配置";
+      el.textContent = "Not configured";
       return;
     }
     el.textContent = (c.provider || "") + " · " + (c.model || "");
-    el.title = el.textContent + (c.hasKey ? "\n密钥来源：" + (c.keyFrom === "local" ? "本机面板" : "连接配置") : "\n无密钥（本地模型）");
+    el.title = el.textContent + (c.hasKey ? "\nKey source: " + (c.keyFrom === "local" ? "Local panel" : "Connection settings") : "\nNo key (local model)");
   }
 
   function aiConfigMsg(text, kind) {
@@ -1894,37 +1894,37 @@
   }
 
   function aiReadyText(cfg) {
-    if (!cfg) { return "读取 AI 配置失败（侧车未响应）"; }
+    if (!cfg) { return "Failed to read AI configuration (sidecar not responding)"; }
     if (!cfg.ready) {
       var miss = (cfg.missing || []).map(function (k) { return AI_MISSING_LABEL[k] || k; });
-      return "还缺：" + miss.join("、") + " —— 点右上角 ⚙ 配置";
+      return "Missing: " + miss.join(", ") + " — click ⚙ in the top right to configure";
     }
     // 聊天模式：只发你写的话，不带任何笔记内容
     if (aiIsChat()) {
       var msg = aiInputText();
-      return msg ? ("就绪 · 发送你的消息（" + aiCharCount(msg) + " 字，不带笔记内容）")
-                 : "聊天模式 · 写下你想说的就能发送（不带笔记内容）";
+      return msg ? ("Ready · sending message (" + aiCharCount(msg) + " chars, without note content)")
+                 : "Chat mode · enter a message to send (without note content)";
     }
     var def = aiTaskDef(aiState.task);
     var tgt = aiTarget();
     if (tgt && !tgt.empty && String(tgt.text).trim()) {
       var n = aiCharCount(tgt.text);
       var cap = cfg.maxChars || 12000;
-      return "就绪 · 将发送" + tgt.label + "（" + n + " 字）" + (n > cap ? "，超上限会截断至 " + cap : "");
+      return "Ready · will send " + tgt.label + " (" + n + " chars)" + (n > cap ? ", will be truncated to " + cap : "");
     }
     // 没有正文：只有「提问」「续写」能继续，且必须自己写下问题/要求
     if (!def.noContext) {
-      var why = "当前没有可发送的正文";
-      if (tgt && tgt.noNote) { why = "还没选笔记"; }
-      else if (tgt && tgt.mode === "none") { why = "已清除分析对象"; }
-      else if (tgt && tgt.mode === "selection") { why = "没有选中内容"; }
-      else { why = "这篇笔记还没有内容"; }
-      return why + "：「" + def.label + "」需要正文。可点「整篇笔记」，或改用「提问」不带笔记直接聊。";
+      var why = "No text content available to send";
+      if (tgt && tgt.noNote) { why = "No note selected"; }
+      else if (tgt && tgt.mode === "none") { why = "Target cleared"; }
+      else if (tgt && tgt.mode === "selection") { why = "No text selected"; }
+      else { why = "This note has no content yet"; }
+      return why + ": “" + def.label + "” requires note content. Click “Full note” or switch to “Ask” to chat without a note.";
     }
     if (!aiInputText()) {
-      return "不带笔记内容 · " + (def.id === "ask" ? "在下方写下你的问题即可发送" : "在下方写下要写什么即可发送");
+      return "No note content · " + (def.id === "ask" ? "enter your question below to send" : "describe what to write below to send");
     }
-    return "不带笔记内容 · 将按你的要求" + (def.id === "ask" ? "回答" : "生成");
+    return "No note content · will " + (def.id === "ask" ? "answer" : "generate") + " based on your instructions";
   }
 
   /** 拉一次配置：刷新表单、标题、状态与按钮可用性 */
@@ -1986,7 +1986,7 @@
 
   /** persist=true 落盘（长期有效）；false 只用于「测试连接」，不写入配置文件 */
   function submitAIConfig(persist) {
-    aiConfigMsg(persist ? "正在保存…" : "正在应用（不保存）…", "");
+    aiConfigMsg(persist ? "Saving…" : "Applying (not saving)…", "");
     return S.aiSetConfig(collectAIConfigForm(), persist).then(function (view) {
       aiState.cfg = view;
       aiState.cfgPristine = true;
@@ -1995,44 +1995,44 @@
       refreshAITargetUI();
       if (persist) {
         var where = view.keyOnDisk
-          ? "配置已保存（密钥已存到本机插件数据目录）"
-          : (view.hasKey ? "配置已保存（密钥仅在本次会话有效：未勾选「在本机记住密钥」）" : "配置已保存");
+          ? "Configuration saved (API key stored in local plugin data directory)"
+          : (view.hasKey ? "Configuration saved (API key valid for this session only; “Remember key on this machine” unchecked)" : "Configuration saved");
         aiConfigMsg(where, "ok");
-        toast("AI 配置已保存");
+        toast("AI configuration saved");
         // 存完就没什么要看的了，收起弹框（有错时留着让用户看）
         closeAIConfigModal();
       } else {
-        aiConfigMsg("参数已应用但未保存：点「保存」才会长期有效", "");
+        aiConfigMsg("Settings applied but not saved: click “Save” to keep them permanently", "");
       }
       return view;
     }).catch(function (e) {
-      aiConfigMsg("保存失败：" + aiErrText(e), "err");
+      aiConfigMsg("Save failed: " + aiErrText(e), "err");
     });
   }
 
   function testAIConfig() {
     var btn = $("aic-test");
     if (btn) { btn.disabled = true; }
-    aiConfigMsg("正在测试连接（最长约一分钟）…", "");
+    aiConfigMsg("Testing connection (may take up to one minute)…", "");
     S.aiTest(collectAIConfigForm()).then(function (r) {
       if (r && r.success) {
-        aiConfigMsg(r.message || "连接成功", "ok");
+        aiConfigMsg(r.message || "Connected successfully", "ok");
       } else {
-        aiConfigMsg((r && r.message) || "测试失败（没有返回原因）", "err");
+        aiConfigMsg((r && r.message) || "Test failed (no reason returned)", "err");
       }
     }).catch(function (e) {
-      aiConfigMsg("测试失败：" + aiErrText(e), "err");
+      aiConfigMsg("Test failed: " + aiErrText(e), "err");
     }).then(function () {
       if (btn) { btn.disabled = false; }
     });
   }
 
   function clearLocalAIConfig() {
-    confirmListModal("清除本机保存的 AI 配置？", [
-      "会删除本机插件数据目录里的 AI 配置文件（含可能保存的密钥），",
-      "之后以「AI.MD 笔记」连接里的 AI 配置为准。",
-      "笔记、连接与存储目录都不受影响。"
-    ], "清除").then(function (ok) {
+    confirmListModal("Clear locally saved AI configuration?", [
+      "This deletes the AI configuration file (including any saved API keys) from the local plugin data directory.",
+      "The connection configuration for “AI.MD Notes” will be used instead.",
+      "Notes, connection settings, and storage directory will remain unchanged."
+    ], "Clear").then(function (ok) {
       if (!ok) { return; }
       S.aiResetConfig().then(function (view) {
         aiState.cfg = view;
@@ -2040,10 +2040,10 @@
         syncAIConfigForm(view);
         renderAIModel();
         refreshAITargetUI();
-        aiConfigMsg("已清除本机配置，现在以连接配置为准", "ok");
-        toast("已清除本机 AI 配置");
+        aiConfigMsg("Local configuration cleared; now using connection configuration", "ok");
+        toast("Local AI configuration cleared");
       }).catch(function (e) {
-        aiConfigMsg("清除失败：" + aiErrText(e), "err");
+        aiConfigMsg("Clear failed: " + aiErrText(e), "err");
       });
     });
   }
@@ -2055,12 +2055,12 @@
     d.className = "aip-hint";
     // 提示语要跟着模式变：聊天模式下说"选一种任务"会让人以为还得先选点什么
     var lines = aiIsChat()
-      ? ["直接在这里和 AI 对话（纯文字，不带任何笔记内容）。",
-         "想让 AI 处理笔记、或把结果写回笔记，切到上方「创作」。",
-         "模型参数点右上角 ⚙ 配置。"]
-      : ["选一种任务后点下方按钮；要发给模型的内容看上方「分析对象」。",
-         "「清除」则不发送笔记正文，「提问」「续写」仍可用。",
-         "结果不会自动写回 —— 由你选择「插入到光标 / 替换选中 / 追加到末尾 / 复制」。"];
+      ? ["Chat directly with AI here (text only, no note content sent).",
+         "To analyze a note or write results back, switch to “Compose” above.",
+         "Configure model settings via ⚙ in the top right."]
+      : ["Select a task and click the button below; see “Target” above for content to be sent.",
+         "“Clear” sends no note content; “Ask” and “Continue” remain available.",
+         "Results are never written back automatically — choose “Insert at cursor / Replace selection / Append to end / Copy”."];
     lines.forEach(function (t, i) {
       if (i) { d.appendChild(document.createElement("br")); }
       d.appendChild(document.createTextNode(t));
@@ -2071,12 +2071,12 @@
   // 创作模式：结果是要写进笔记的，四个操作都要；
   // 聊天模式：纯对话，没有"要写回哪儿"这回事，只留「复制」。
   var AI_OPS_CREATE = [
-    { op: "insert", text: "插入到光标" },
-    { op: "replace", text: "替换选中" },
-    { op: "append", text: "追加到末尾" },
-    { op: "copy", text: "复制" }
+    { op: "insert", text: "Insert at cursor" },
+    { op: "replace", text: "Replace selection" },
+    { op: "append", text: "Append to end" },
+    { op: "copy", text: "Copy" }
   ];
-  var AI_OPS_CHAT = [{ op: "copy", text: "复制" }];
+  var AI_OPS_CHAT = [{ op: "copy", text: "Copy" }];
 
   function aiEntryEl(en) {
     var box = document.createElement("div");
@@ -2087,13 +2087,13 @@
     var task = document.createElement("span");
     task.className = "aip-entry-task";
     task.textContent = en.kind === "chat"
-      ? "聊天"
-      : (en.taskLabel + (en.targetLabel ? "（" + en.targetLabel + "）" : ""));
+      ? "Chat"
+      : (en.taskLabel + (en.targetLabel ? " (" + en.targetLabel + ")" : ""));
     head.appendChild(task);
     var note = document.createElement("span");
     note.className = "aip-entry-note";
-    note.textContent = en.kind === "chat" ? "不带笔记内容"
-      : (en.noteName ? ("《" + en.noteName + "》") : "（不带笔记内容）");
+    note.textContent = en.kind === "chat" ? "No note content"
+      : (en.noteName ? ("“" + en.noteName + "”") : "(No note content)");
     head.appendChild(note);
     var meta = document.createElement("span");
     meta.className = "aip-entry-meta";
@@ -2104,21 +2104,21 @@
     if (en.instruction) {
       var ins = document.createElement("div");
       ins.className = "aip-entry-instr";
-      ins.textContent = (en.task === "ask" ? "问：" : "要求：") + en.instruction;
+      ins.textContent = (en.task === "ask" ? "Question: " : "Instructions: ") + en.instruction;
       box.appendChild(ins);
     }
 
     if (en.pending) {
       var busy = document.createElement("div");
       busy.className = "aip-busy";
-      busy.textContent = "生成中…（通常几秒到几十秒，慢模型请耐心等待）";
+      busy.textContent = "Generating… (usually seconds to tens of seconds, please wait for slower models)";
       box.appendChild(busy);
       return box;
     }
 
     var body = document.createElement("pre");
     body.className = "aip-entry-body" + (en.error ? " err" : "");
-    body.textContent = en.error ? ("失败：" + en.error) : (en.result || "（空结果）");
+    body.textContent = en.error ? ("Failed: " + en.error) : (en.result || "(Empty result)");
     box.appendChild(body);
 
     if (!en.error && en.result) {
@@ -2152,10 +2152,10 @@
   }
 
   function clearAILog() {
-    if (!aiState.entries.length) { toast("还没有对话记录"); return; }
+    if (!aiState.entries.length) { toast("No conversation history yet"); return; }
     aiState.entries = [];
     renderAILog();
-    toast("已清空对话记录");
+    toast("Conversation history cleared");
   }
 
   /* ---------------- 执行任务 ---------------- */
@@ -2164,21 +2164,21 @@
     if (aiState.busy) { return; }
     var chat = aiIsChat();
     // 聊天模式：没有任务、没有对象，就是把你说的话发出去（task 用 ask，text 为空 = 不带笔记）
-    var def = chat ? { id: "ask", label: "聊天", go: "发送", noContext: true } : aiTaskDef(aiState.task);
+    var def = chat ? { id: "ask", label: "Chat", go: "Send", noContext: true } : aiTaskDef(aiState.task);
     var tgt = chat ? null : aiTarget();
     var extra = aiInputText();
     var text = (tgt && !tgt.empty) ? String(tgt.text) : "";
     var hasText = !!text.trim();
 
     if (chat) {
-      if (!extra) { toast("先写点什么再发送", "warn"); return; }
+      if (!extra) { toast("Enter a message before sending", "warn"); return; }
     } else if (def.id === "ask" && !extra) {
-      toast(hasText ? "请先在下方写下你的问题" : "请先在下方写下你的问题（不带笔记也能问）", "warn");
+      toast(hasText ? "Enter your question below first" : "Enter your question below first (you can ask without a note)", "warn");
       return;
     } else if (!hasText) {
       // 没有正文：只有 noContext 的任务能跑，且必须自己写下问题/要求
       if (!def.noContext) { toast(aiReadyText(aiState.cfg), "warn"); return; }
-      if (!extra) { toast("请先在下方写下要写什么", "warn"); return; }
+      if (!extra) { toast("Describe what to write below first", "warn"); return; }
     }
 
     var entry = {
@@ -2189,7 +2189,7 @@
       noteName: (tgt && tgt.note) ? String(tgt.note.name || "") : "",
       instruction: extra,
       // 「选中内容」/「整篇笔记」/「不带笔记内容」—— 记录本次实际用了什么
-      targetLabel: hasText ? tgt.label : "不带笔记内容",
+      targetLabel: hasText ? tgt.label : "No note content",
       hasSelection: hasText && !!tgt.hasSelection,
       scopeChars: hasText ? aiCharCount(text) : 0,
       result: "",
@@ -2203,16 +2203,16 @@
     renderAILog();
     setAIReady(aiState.cfg);
     var go = $("aip-go");
-    if (go) { go.textContent = chat ? "发送中…" : "生成中…"; }
+    if (go) { go.textContent = chat ? "Sending…" : "Generating…"; }
 
     var started = Date.now();
     S.aiChat(def.id, text, extra).then(function (r) {
       entry.pending = false;
       entry.result = String((r && r.content) || "");
-      if (!entry.result) { entry.error = "模型返回了空内容"; }
+      if (!entry.result) { entry.error = "Model returned empty content"; }
       var bits = [];
       if (r && r.model) { bits.push(r.model); }
-      if (r && r.truncated) { bits.push("已截断至 " + r.sentChars + " 字"); }
+      if (r && r.truncated) { bits.push("Truncated to " + r.sentChars + " chars"); }
       bits.push(((r && r.latencyMs != null) ? r.latencyMs : (Date.now() - started)) + " ms");
       entry.meta = bits.join(" · ");
     }).catch(function (e) {
@@ -2222,7 +2222,7 @@
       aiState.busy = false;
       renderAILog();
       var g = $("aip-go");
-      if (g) { g.textContent = aiIsChat() ? "发送" : aiTaskDef(aiState.task).go; }
+      if (g) { g.textContent = aiIsChat() ? "Send" : aiTaskDef(aiState.task).go; }
       refreshAITargetUI();
     });
   }
@@ -2238,16 +2238,16 @@
   function applyAIResult(en, op) {
     var ed = $("editor");
     var n = activeNote();
-    if (!ed || !n) { toast("请先在左侧选择一条笔记", "warn"); return; }
+    if (!ed || !n) { toast("Select a note on the left first", "warn"); return; }
     if (en.noteId && n.id !== en.noteId) {
       // 结果来自另一篇笔记：写进去几乎一定是误操作，先问一句
       // （noteId 为 null = 生成时就没带笔记，不存在"串笔记"的问题，直接写）
-      confirmListModal("这段结果来自另一篇笔记", [
-        "结果生成自：《" + en.noteName + "》",
-        "当前编辑的是：《" + String(n.name || "") + "》",
+      confirmListModal("This result is from a different note", [
+        "Result generated from: “" + en.noteName + "”",
+        "Currently editing: “" + String(n.name || "") + "”",
         "",
-        "继续会把结果写入《" + String(n.name || "") + "》。"
-      ], "继续写入").then(function (ok) {
+        "Continuing will write the result into “" + String(n.name || "") + "”."
+      ], "Continue").then(function (ok) {
         if (ok) { doApplyAIResult(en, op, ed, n); }
       });
       return;
@@ -2257,8 +2257,8 @@
 
   function doApplyAIResult(en, op, ed, n) {
     var result = String(en.result || "");
-    if (!result) { toast("这条结果没有内容", "warn"); return; }
-    if (op === "copy") { copyText(result, "AI 结果"); return; }
+    if (!result) { toast("This result has no content", "warn"); return; }
+    if (op === "copy") { copyText(result, "AI result"); return; }
 
     var v = String(ed.value || "");
     var sel = currentSelection(ed);
@@ -2268,31 +2268,31 @@
       ed.value = v + tail + result;
       ed.selectionStart = ed.selectionEnd = ed.value.length;
       commitEditor(n, ed);
-      toast("已追加到末尾");
+      toast("Appended to end");
       return;
     }
 
     // 换行/覆盖都会改动已有正文，一律先确认（选中时的「插入」其实也是替换）
     if (op === "replace" || sel) {
-      if (!sel) { toast("当前没有选中内容，无法替换", "warn"); return; }
+      if (!sel) { toast("No text selected; cannot replace", "warn"); return; }
       var oldText = v.slice(sel.start, sel.end);
       var oldLines = oldText.split(/\r?\n/).length;
       var newLines = result.split(/\r?\n/).length;
-      confirmListModal("确认替换选中的内容？", [
-        "范围：" + sel.start + "–" + sel.end + "（" + oldText.length + " 字）",
-        "行数：" + oldLines + " 行 → " + newLines + " 行",
+      confirmListModal("Replace selected content?", [
+        "Range: " + sel.start + "–" + sel.end + " (" + oldText.length + " chars)",
+        "Lines: " + oldLines + " lines → " + newLines + " lines",
         "",
-        "替换前的内容：",
+        "Content before replacement:",
         oldText.slice(0, 300) + (oldText.length > 300 ? "…" : "")
-      ], "替换").then(function (ok) {
+      ], "Replace").then(function (ok) {
         if (!ok) { return; }
         var cur = String(ed.value || "");
         // 确认框期间用户可能又改了正文：范围越界就放弃，绝不写坏
-        if (sel.end > cur.length) { toast("正文已变化，请重新选择后再替换", "warn"); return; }
+        if (sel.end > cur.length) { toast("Content changed; please reselect before replacing", "warn"); return; }
         ed.value = cur.slice(0, sel.start) + result + cur.slice(sel.end);
         ed.selectionStart = ed.selectionEnd = sel.start + result.length;
         commitEditor(n, ed);
-        toast("已替换选中内容");
+        toast("Replaced selected content");
       });
       return;
     }
@@ -2302,7 +2302,7 @@
     ed.value = v.slice(0, at) + result + v.slice(at);
     ed.selectionStart = ed.selectionEnd = at + result.length;
     commitEditor(n, ed);
-    toast("已插入到光标处");
+    toast("Inserted at cursor");
   }
 
   function commitEditor(n, ed) {
@@ -2354,7 +2354,7 @@
       renderAITarget();
       refreshAITargetUI();
     }
-    if (task) { toast("已切到「创作 · " + aiTaskDef(task).label + "」"); }
+    if (task) { toast("Switched to “Compose · " + aiTaskDef(task).label + "”"); }
   }
 
   function toggleAIPanel() { setAIPanelOpen(!aiState.open); }
@@ -2466,9 +2466,9 @@
 
   // ---------------- 事件绑定 ----------------
   function bindEvents() {
-    click("btn-new-note", function () { createNote("未命名笔记", targetFolderId(), ""); });
+    click("btn-new-note", function () { createNote("Untitled note", targetFolderId(), ""); });
     click("btn-new-folder", function () { newFolderFlow(targetFolderId()); });
-    click("btn-empty-new", function () { createNote("未命名笔记", targetFolderId(), ""); });
+    click("btn-empty-new", function () { createNote("Untitled note", targetFolderId(), ""); });
 
     click("btn-rename", function () { var n = selectedNode(); if (n) { renameNode(n); } });
     click("btn-move", function () { var n = selectedNode(); if (n) { moveNodeFlow(n); } });
@@ -2539,7 +2539,7 @@
         renderTree();
       };
     } else {
-      S.log("绑定 oninput → #search", false, "元素不存在，检索功能不可用");
+      S.log("Bind oninput → #search", false, "Element not found; search unavailable");
     }
     click("search-clear", function () {
       search.value = ""; state.query = ""; $("search-clear").hidden = true; renderTree(); search.focus();
@@ -2549,7 +2549,7 @@
     title.oninput = function () {
       var n = activeNote();
       if (!n) { return; }
-      n.name = title.value || "未命名笔记";
+      n.name = title.value || "Untitled note";
       n.updatedAt = nowISO();
       persist(true);
       renderTree();
@@ -2557,7 +2557,7 @@
     title.onblur = function () {
       var n = activeNote();
       if (!n) { return; }
-      var clean = uniqueName(n.parentId, String(n.name || "未命名笔记").trim() || "未命名笔记", n.id);
+      var clean = uniqueName(n.parentId, String(n.name || "Untitled note").trim() || "Untitled note", n.id);
       n.name = clean;
       title.value = clean;
       persist(false);
@@ -2600,7 +2600,7 @@
     // 置顶诊断条上的按钮：随 SHOW_DIAG_BAR 一起下线（元素已注释，绑定会打日志噪音）。
     // 需要排障时连同上面的开关一起放开：
     // click("diag-toggle", function () { diagOpen = !diagOpen; renderDiag(); });
-    // click("diag-copy", function () { copyText(S.report(), "诊断报告"); });
+    // click("diag-copy", function () { copyText(S.report(), "diagnostic report"); });
     // click("diag-detail", openStoreModal);
 
     // 状态栏胶囊 → 状态详情弹窗
@@ -2611,12 +2611,12 @@
       var typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || "");
       if (mod && (e.key === "s" || e.key === "S")) {
         e.preventDefault();
-        S.flush().then(function () { toast("已保存"); });
+        S.flush().then(function () { toast("Saved"); });
         return;
       }
       if (mod && (e.key === "n" || e.key === "N")) {
         e.preventDefault();
-        createNote("未命名笔记", targetFolderId(), "");
+        createNote("Untitled note", targetFolderId(), "");
         return;
       }
       if (mod && (e.key === "i" || e.key === "I")) {
@@ -2666,7 +2666,7 @@
   }
 
   function boot() {
-    S.log("前端 boot 开始", null, "readyState=" + document.readyState);
+    S.log("Frontend boot started", null, "readyState=" + document.readyState);
 
     // 状态/日志一变就刷新状态栏 + 置顶诊断条
     S.onStatus(function () {
@@ -2676,36 +2676,36 @@
       try { renderDiag(); } catch (e) { /* ignore */ }
     });
 
-    var phase = "绑定事件";
+    var phase = "Bind events";
     try {
       bindEvents();
-      phase = "初始化三栏布局";
+      phase = "Initialize three-column layout";
       initChrome();
-      phase = "应用主题";
+      phase = "Apply theme";
       applyTheme();
-      phase = "读取已配置目录";
+      phase = "Read configured directory";
       readConfiguredDir();
-      phase = "首次渲染";
+      phase = "Initial render";
       renderStatus(S.status());
       renderDiag(S.status());
-      S.log("前端 UI 就绪", true, "按钮绑定完成（置顶诊断条已下线），接下来调用存储 init()");
+      S.log("Frontend UI ready", true, "Button bindings complete (top diagnostic bar offline); initializing storage via init()");
     } catch (e) {
       // 关键：任何前置阶段出错也要把诊断条画出来，否则用户只会看到一个死界面
-      S.log("前端启动中断", false, phase + " 阶段抛错：" + ((e && e.message) || String(e)));
+      S.log("Frontend boot interrupted", false, phase + " phase threw error: " + ((e && e.message) || String(e)));
       try { renderDiag(S.status()); } catch (e2) { /* ignore */ }
-      try { toast("界面初始化出错，请查看页顶诊断条", "warn"); } catch (e2) { /* ignore */ }
+      try { toast("UI initialization error; check diagnostics at the top", "warn"); } catch (e2) { /* ignore */ }
     }
 
     var initResult;
     try {
       initResult = S.init();
     } catch (e) {
-      S.log("调用存储 init() 抛错", false, (e && e.message) || String(e));
+      S.log("Call to storage init() threw error", false, (e && e.message) || String(e));
       try { renderDiag(S.status()); } catch (e2) { /* ignore */ }
       return;
     }
     if (!initResult || typeof initResult.then !== "function") {
-      S.log("调用存储 init()", false, "未返回 Promise（存储层可能未正确加载）");
+      S.log("Call to storage init()", false, "Did not return a Promise (storage layer may not have loaded correctly)");
       return;
     }
 
@@ -2732,7 +2732,7 @@
       }
       state.loaded = true;
       if (!S.status().persistent) {
-        toast("存储未就绪，笔记不会落盘。请看页顶诊断条。", "warn");
+        toast("Storage not ready; notes will not be saved to disk. Check diagnostics at the top.", "warn");
       }
 
       if (state.activeId && !byId(state.activeId)) { state.activeId = null; }
@@ -2758,7 +2758,7 @@
       probeWritable();
       if (seeded) { persist(false); }
     }).catch(function (e) {
-      S.log("存储 init() 收尾异常", false, (e && e.message) || String(e));
+      S.log("Storage init() completion error", false, (e && e.message) || String(e));
       try { renderDiag(S.status()); } catch (e2) { /* ignore */ }
     });
   }
@@ -2767,14 +2767,14 @@
   function probeWritable() {
     return S.invoke("notes/probe", {}).then(function (r) {
       if (r && r.ok === false) {
-        S.log("存储可写性探测失败", false, (r && r.error) || "未知原因");
+        S.log("Storage writability probe failed", false, (r && r.error) || "Unknown error");
       } else {
-        S.log("存储可写性探测通过", true, (r && r.dir) || "");
+        S.log("Storage writability probe passed", true, (r && r.dir) || "");
       }
       return !!(r && r.ok !== false);
     }).catch(function (e) {
       // 老版本侧车没有 notes/probe：退化成 ping（同样不写任何数据）
-      S.log("可写性探测不可用，回退 ping", false, (e && e.message) || String(e));
+      S.log("Writability probe unavailable, falling back to ping", false, (e && e.message) || String(e));
       return true;
     });
   }
@@ -2789,11 +2789,11 @@
   function bootOnce(why) {
     if (booted) { return; }
     booted = true;
-    S.log("触发 boot", null, why);
+    S.log("Trigger boot", null, why);
     try {
       boot();
     } catch (e) {
-      S.log("boot 抛出异常", false, (e && e.message) || String(e));
+      S.log("boot threw exception", false, (e && e.message) || String(e));
       try { renderDiag(S.status()); } catch (e2) { /* ignore */ }
     }
   }
@@ -2801,8 +2801,8 @@
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () { bootOnce("DOMContentLoaded"); });
   } else {
-    bootOnce("脚本执行时 DOM 已就绪（readyState=" + document.readyState + "）");
+    bootOnce("DOM ready when script executed (readyState=" + document.readyState + ")");
   }
   // 兜底：万一 DOMContentLoaded 没触发（历史事故里出现过界面完全不动的情况），3 秒后强制启动一次
-  setTimeout(function () { bootOnce("兜底计时器 3s"); }, 3000);
+  setTimeout(function () { bootOnce("Fallback timer 3s"); }, 3000);
 })();

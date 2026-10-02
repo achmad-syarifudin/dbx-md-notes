@@ -92,7 +92,7 @@ func TestAIChatOpenAICompatible(t *testing.T) {
 	if gotReq.Header.Get("Authorization") != "Bearer sk-secret-1234567890" {
 		t.Fatalf("鉴权头不对：%q", gotReq.Header.Get("Authorization"))
 	}
-	if !strings.Contains(gotBody, "润色") || !strings.Contains(gotBody, "更简洁") {
+	if !strings.Contains(gotBody, "Polish") || !strings.Contains(gotBody, "更简洁") {
 		t.Fatalf("提示词没带上任务与额外要求：%s", gotBody)
 	}
 	usage := out["usage"].(map[string]any)
@@ -132,7 +132,7 @@ func TestAIChatAuthErrorRedactsKey(t *testing.T) {
 	if perr == nil {
 		t.Fatalf("401 应该报错")
 	}
-	if !strings.Contains(perr.Message, "鉴权失败") {
+	if !strings.Contains(perr.Message, "Authentication failed") {
 		t.Fatalf("错误信息不够可读：%s", perr.Message)
 	}
 	if strings.Contains(perr.Message, key) {
@@ -144,7 +144,7 @@ func TestAIChatRejectsNonJSON(t *testing.T) {
 	srv := fakeModel(t, 200, "<html>gateway error</html>", nil, nil)
 	enableAI(t, srv.URL+"/v1", "fake-1", "openai", "sk-1234567890", nil)
 	_, perr := callRaw(t, "ai/chat", map[string]any{"task": "analyze", "text": "正文"})
-	if perr == nil || !strings.Contains(perr.Message, "无法解析") {
+	if perr == nil || !strings.Contains(perr.Message, "Could not parse") {
 		t.Fatalf("非 JSON 应给出可读错误，实际：%v", perr)
 	}
 }
@@ -217,7 +217,7 @@ func TestConnectionActionTestAI(t *testing.T) {
 		t.Fatalf("connection/action 失败：%s", err.Message)
 	}
 	out := res.(map[string]any)
-	if out["success"] != true || !strings.Contains(out["message"].(string), "连接成功") {
+	if out["success"] != true || !strings.Contains(out["message"].(string), "Connection successful") {
 		t.Fatalf("测试连接应成功：%v", out)
 	}
 	// 未启用 / 未知动作
@@ -471,10 +471,10 @@ func TestAIChatWithoutNoteText(t *testing.T) {
 	if res.(map[string]any)["content"] != "润色后的正文" {
 		t.Fatalf("结果应正常返回：%v", res)
 	}
-	if !strings.Contains(gotBody, "没有提供笔记原文") || !strings.Contains(gotBody, "你好") {
+	if !strings.Contains(gotBody, "haven't provided any note text") || !strings.Contains(gotBody, "你好") {
 		t.Fatalf("提示词应说明没有笔记上下文并带上问题：%s", gotBody)
 	}
-	if strings.Contains(gotBody, "笔记正文") {
+	if strings.Contains(gotBody, "Note content:") {
 		t.Fatalf("没有正文时不该拼空的「笔记正文」段落：%s", gotBody)
 	}
 
@@ -495,7 +495,7 @@ func TestAIChatWithoutNoteText(t *testing.T) {
 		if e == nil {
 			t.Fatalf("%s 没有正文时应被拒", task)
 		}
-		if !strings.Contains(e.Message, "整篇笔记") || !strings.Contains(e.Message, "提问") {
+		if !strings.Contains(e.Message, "entire note") || !strings.Contains(e.Message, "Ask") {
 			t.Fatalf("%s 的错误信息要给出路（整篇笔记 / 提问）：%s", task, e.Message)
 		}
 	}

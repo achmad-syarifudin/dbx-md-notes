@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AI.MD 笔记</title>
+  <title>AI.MD Notes</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body class="light">
@@ -13,33 +13,33 @@
       <div class="side-head">
         <div class="brand">
           <span class="brand-mark">AI.MD</span>
-          <span>笔记</span>
+          <span>Notes</span>
         </div>
-        <button id="btn-theme" class="icon-btn" title="切换明暗（本地预览用）">&#9686;</button>
+        <button id="btn-theme" class="icon-btn" title="Toggle light/dark theme (local preview)">&#9686;</button>
       </div>
 
       <div class="side-tools">
-        <button id="btn-new-note" class="primary">+ 新建笔记</button>
-        <button id="btn-new-folder">+ 文件夹</button>
+        <button id="btn-new-note" class="primary">+ New Note</button>
+        <button id="btn-new-folder">+ Folder</button>
       </div>
 
       <div class="search-wrap">
-        <input id="search" type="search" placeholder="全文检索标题与正文…" autocomplete="off" />
-        <button id="search-clear" class="clear-btn" title="清除检索" hidden>&#215;</button>
+        <input id="search" type="search" placeholder="Search note titles and contents…" autocomplete="off" />
+        <button id="search-clear" class="clear-btn" title="Clear search" hidden>&#215;</button>
       </div>
 
       <div id="tree" class="tree"></div>
 
       <div id="sel-actions" class="sel-actions" hidden>
-        <button id="btn-rename">重命名</button>
-        <button id="btn-move">移动到…</button>
-        <button id="btn-delete" class="danger">删除</button>
+        <button id="btn-rename">Rename</button>
+        <button id="btn-move">Move to…</button>
+        <button id="btn-delete" class="danger">Delete</button>
       </div>
 
       <div id="side-foot" class="side-foot"></div>
     </aside>
 
-    <div id="gutter-side" class="gutter" role="separator" aria-orientation="vertical" title="拖动调整目录区宽度（双击复位）"></div>
+    <div id="gutter-side" class="gutter" role="separator" aria-orientation="vertical" title="Drag to resize sidebar (double-click to reset)"></div>
 
     <main id="main">
       <!-- 置顶诊断条：上线时已关闭（app.js 里 SHOW_DIAG_BAR=false）。
@@ -47,79 +47,79 @@
            <div id="diag-bar" class="diag-bar" data-sev="warn">
              <div class="diag-head">
                <span class="diag-dot"></span>
-               <span class="diag-title">存储诊断</span>
-               <span id="diag-verdict" class="diag-verdict">正在初始化…</span>
+               <span class="diag-title">Storage diagnostics</span>
+               <span id="diag-verdict" class="diag-verdict">Initializing…</span>
                <span id="diag-summary" class="diag-summary"></span>
                <span class="diag-spacer"></span>
-               <button id="diag-toggle" class="diag-btn">收起日志</button>
-               <button id="diag-copy" class="diag-btn">复制诊断</button>
-               <button id="diag-detail" class="diag-btn">状态详情</button>
+               <button id="diag-toggle" class="diag-btn">Hide log</button>
+               <button id="diag-copy" class="diag-btn">Copy diagnostics</button>
+               <button id="diag-detail" class="diag-btn">Status details</button>
              </div>
-             <pre id="diag-log" class="diag-log">（等待日志…）</pre>
+             <pre id="diag-log" class="diag-log">(Waiting for log…)</pre>
            </div>
       -->
 
       <div class="toolbar">
-        <input id="title" class="title-input" placeholder="笔记标题" />
+        <input id="title" class="title-input" placeholder="Note title" />
         <div class="toolbar-right">
-          <button id="btn-table-note">为表新建笔记</button>
-          <button id="btn-insert-sql">插入 SQL 块</button>
-          <button id="btn-ai" title="打开 / 收起右侧 AI 助手栏（Ctrl/Cmd+I）">AI 助手</button>
-          <!-- <button id="btn-copy-sql">复制 SQL 到 DBX</button> -->
+          <button id="btn-table-note">New Note for Table</button>
+          <button id="btn-insert-sql">Insert SQL Block</button>
+          <button id="btn-ai" title="Show/hide AI assistant (Ctrl/Cmd+I)">AI Assistant</button>
+          <!-- <button id="btn-copy-sql">Copy SQL to DBX</button> -->
           <span class="sep"></span>
-          <button id="btn-export-md">导出 .md</button>
+          <button id="btn-export-md">Export .md</button>
           <!-- 导入功能暂时下线（app.js 里 ENABLE_IMPORT=false）。
                恢复：把 app.js 的 ENABLE_IMPORT 改成 true，并把下面两处取消注释。 -->
-          <!-- <button id="btn-import-md">导入 .md</button> -->
-          <button id="btn-backup-zip">备份 zip</button>
-          <button id="btn-restore-zip">恢复备份…</button>
+          <!-- <button id="btn-import-md">Import .md</button> -->
+          <button id="btn-backup-zip">Backup zip</button>
+          <button id="btn-restore-zip">Restore Backup…</button>
         </div>
       </div>
 
       <div id="panes" class="panes" data-view="split" data-empty="1">
-        <textarea id="editor" class="editor" placeholder="在此输入 Markdown…（支持标题、列表、代码块、表格、加粗、引用；```sql 代码块会高亮）" spellcheck="false"></textarea>
+        <textarea id="editor" class="editor" placeholder="Write Markdown here… (headings, lists, code blocks, tables, bold, quotes; ```sql blocks are highlighted)" spellcheck="false"></textarea>
         <div id="preview" class="preview markdown-body"></div>
         <div id="empty" class="empty">
           <div class="empty-card">
             <div class="empty-mark">📝</div>
-            <h2>开始记录你的第一篇笔记</h2>
-            <p>在左侧选择一条笔记，或新建一篇开始。</p>
-            <button id="btn-empty-new" class="primary big">+ 新建笔记</button>
+            <h2>Start your first note</h2>
+            <p>Select a note on the left, or create one to get started.</p>
+            <button id="btn-empty-new" class="primary big">+ New Note</button>
           </div>
         </div>
       </div>
 
       <div class="statusbar">
-        <span id="store-status" class="store-status"><span class="store-dot"></span><span id="store-text">存储检测中…</span></span>
+        <span id="store-status" class="store-status"><span class="store-dot"></span><span id="store-text">Checking storage…</span></span>
         <span id="note-meta" class="note-meta"></span>
         <span class="spacer"></span>
         <span class="view-switch" id="view-switch">
-          <button data-view="edit">编辑</button>
-          <button data-view="split" class="on">双栏</button>
-          <button data-view="preview">预览</button>
+          <button data-view="edit">Edit</button>
+          <button data-view="split" class="on">Split View</button>
+          <button data-view="preview">Preview</button>
         </span>
-        <span id="counter" class="counter">0 字</span>
+        <span id="counter" class="counter">0 characters</span>
       </div>
     </main>
 
-    <div id="gutter-ai" class="gutter" role="separator" aria-orientation="vertical" title="拖动调整 AI 助手宽度（双击复位）"></div>
+    <div id="gutter-ai" class="gutter" role="separator" aria-orientation="vertical" title="Drag to resize AI assistant (double-click to reset)"></div>
 
     <!-- AI 助手：常驻右栏（不是弹窗）。默认「聊天」模式；「创作」模式才有分析对象与写回操作。 -->
     <aside id="ai-panel" class="ai-panel" hidden>
       <div class="aip-head">
-        <span class="aip-brand">AI 助手</span>
+        <span class="aip-brand">AI Assistant</span>
         <span id="aip-model" class="aip-model"></span>
-        <button id="aip-cfg-toggle" class="icon-btn" title="AI 模型配置（弹框）">&#9881;</button>
-        <button id="aip-clear-log" class="icon-btn" title="清空对话记录">&#9851;</button>
-        <button id="aip-close" class="icon-btn" title="收起（Ctrl/Cmd+I）">&#10005;</button>
+        <button id="aip-cfg-toggle" class="icon-btn" title="AI model settings">&#9881;</button>
+        <button id="aip-clear-log" class="icon-btn" title="Clear conversation history">&#9851;</button>
+        <button id="aip-close" class="icon-btn" title="Close (Ctrl/Cmd+I)">&#10005;</button>
       </div>
 
       <!-- 两种模式：
            聊天（默认）—— 纯对话，只发你的消息，不带任何笔记内容；
            创作 —— 可指定「分析对象」，结果带四个写回操作。 -->
       <div class="aip-views" id="aip-views">
-        <button id="aip-view-chat" type="button" title="纯对话：只发你的消息，不带笔记内容">聊天</button>
-        <button id="aip-view-create" type="button" title="处理笔记：可指定分析对象，结果能写回笔记">创作</button>
+        <button id="aip-view-chat" type="button" title="Chat: send only your message, without note content">Chat</button>
+        <button id="aip-view-create" type="button" title="Work with notes: choose content and write results back">Create</button>
       </div>
 
       <!-- 上半区整块可滚动；底部的输入/发送区固定在栏底，绝不被内容挤出去 -->
@@ -129,12 +129,12 @@
           <!-- 分析对象：显式可控，且跟着编辑器实时刷新（划选/输入都会更新） -->
           <div class="aip-target">
             <div class="aip-target-bar">
-              <span class="aip-target-title">分析对象</span>
+              <span class="aip-target-title">Content to analyze</span>
               <span class="aip-modes" id="aip-modes">
-                <button id="aip-mode-auto" type="button" title="有选中就用选中，否则用整篇笔记">自动跟随</button>
-                <button id="aip-mode-selection" type="button" title="只看编辑器里当前选中的那一段">选中内容</button>
-                <button id="aip-mode-note" type="button" title="用当前这篇笔记的全文">整篇笔记</button>
-                <button id="aip-mode-none" type="button" title="不使用笔记正文（可以直接提问或让它自由创作）">清除</button>
+                <button id="aip-mode-auto" type="button" title="Use selected text, or the whole note when nothing is selected">Auto</button>
+                <button id="aip-mode-selection" type="button" title="Use only the selected text in the editor">Selection</button>
+                <button id="aip-mode-note" type="button" title="Use the entire current note">Whole Note</button>
+                <button id="aip-mode-none" type="button" title="Do not send note content (ask a question or generate freely)">Clear</button>
               </span>
             </div>
             <div id="aip-target" class="aip-target-body"></div>
@@ -145,19 +145,19 @@
 
         <div id="aip-log" class="aip-log">
           <div class="aip-hint">
-            直接在这里和 AI 对话。<br />
-            想让 AI 处理笔记（分析 / 润色 / 续写）或把结果写回笔记，切到上方「创作」。<br />
-            模型参数点右上角的 ⚙ 配置。
+            Chat with AI here.<br />
+            To analyze, polish, or continue a note—or write results back—switch to Create above.<br />
+            Set up your model with ⚙ in the upper right.
           </div>
         </div>
       </div>
 
       <!-- 固定不动的底栏：不被上面的内容挤出可见区域 -->
       <div class="aip-compose">
-        <textarea id="aip-input" class="aip-input" placeholder="和 AI 说点什么…"></textarea>
+        <textarea id="aip-input" class="aip-input" placeholder="Say something to AI…"></textarea>
         <div class="aip-compose-bar">
           <span id="aip-status" class="aip-status"></span>
-          <button id="aip-go" class="primary">发送</button>
+          <button id="aip-go" class="primary">Send</button>
         </div>
       </div>
     </aside>
@@ -172,16 +172,16 @@
   <!-- 从表新建笔记 -->
   <div id="table-modal" class="modal" hidden>
     <div class="modal-card">
-      <h3>为此表新建笔记</h3>
-      <label class="m-label">表名</label>
-      <input id="tn-table" class="m-input" placeholder="例如 users" />
-      <label class="m-label">字段清单（每行一个，可写 “列名 类型”）</label>
+      <h3>New Note for This Table</h3>
+      <label class="m-label">Table name</label>
+      <input id="tn-table" class="m-input" placeholder="e.g. users" />
+      <label class="m-label">Columns (one per line, e.g. “name type”)</label>
       <textarea id="tn-fields" class="m-text" placeholder="id bigint&#10;name varchar(64)&#10;created_at timestamp"></textarea>
-      <label class="m-label">保存到</label>
+      <label class="m-label">Save in</label>
       <select id="tn-folder" class="m-input"></select>
       <div class="modal-actions">
-        <button id="tn-cancel">取消</button>
-        <button id="tn-ok" class="primary">创建</button>
+        <button id="tn-cancel">Cancel</button>
+        <button id="tn-ok" class="primary">Create</button>
       </div>
     </div>
   </div>
@@ -190,42 +190,42 @@
   <!-- AI 模型配置（弹框）：不再占用聊天区，随时点 ⚙ 打开 -->
   <div id="ai-cfg-modal" class="modal" hidden>
     <div class="modal-card">
-      <h3>AI 模型配置</h3>
+      <h3>AI Model Settings</h3>
       <label class="aip-check">
         <input id="aic-enabled" type="checkbox" />
-        <span>启用 AI 功能</span>
+        <span>Enable AI features</span>
       </label>
-      <label class="m-label" for="aic-provider">服务类型</label>
+      <label class="m-label" for="aic-provider">Provider</label>
       <select id="aic-provider" class="m-input">
-        <option value="openai">OpenAI 兼容（DeepSeek / 通义 / Kimi / 自建网关）</option>
-        <option value="anthropic">Anthropic（Claude）</option>
-        <option value="ollama">Ollama（本地模型，无需密钥）</option>
+        <option value="openai">OpenAI-compatible (DeepSeek / Qwen / Kimi / custom gateway)</option>
+        <option value="anthropic">Anthropic (Claude)</option>
+        <option value="ollama">Ollama (local model, no API key required)</option>
       </select>
-      <label class="m-label" for="aic-baseurl">API 地址</label>
+      <label class="m-label" for="aic-baseurl">API base URL</label>
       <input id="aic-baseurl" class="m-input" placeholder="https://api.deepseek.com/v1" autocomplete="off" />
-      <label class="m-label" for="aic-modelinput">模型名称</label>
+      <label class="m-label" for="aic-modelinput">Model name</label>
       <input id="aic-modelinput" class="m-input" placeholder="deepseek-chat" autocomplete="off" />
-      <label class="m-label" for="aic-key">API 密钥</label>
-      <input id="aic-key" class="m-input" type="password" placeholder="留空 = 不修改已保存的密钥" autocomplete="off" />
+      <label class="m-label" for="aic-key">API key</label>
+      <input id="aic-key" class="m-input" type="password" placeholder="Leave blank to keep the saved API key" autocomplete="off" />
       <label class="aip-check">
         <input id="aic-remember" type="checkbox" />
-        <span>在本机记住密钥（明文存放在本机插件数据目录，非共享电脑再勾选）</span>
+        <span>Remember API key on this device (stored in plaintext in plugin data; avoid on shared computers)</span>
       </label>
       <details class="aip-adv">
-        <summary>高级选项（人设 / 超时 / 单次上限）</summary>
-        <label class="m-label" for="aic-sysprompt">自定义人设（可选）</label>
-        <textarea id="aic-sysprompt" class="m-text" placeholder="留空则使用内置的写作助手人设"></textarea>
+        <summary>Advanced options (system prompt / timeout / input limit)</summary>
+        <label class="m-label" for="aic-sysprompt">Custom system prompt (optional)</label>
+        <textarea id="aic-sysprompt" class="m-text" placeholder="Leave blank to use the built-in writing assistant prompt"></textarea>
         <div class="aip-2col">
-          <label><span class="m-label">单次超时（秒）</span><input id="aic-timeout" class="m-input" type="number" min="5" max="300" /></label>
-          <label><span class="m-label">单次送入上限（字符）</span><input id="aic-maxchars" class="m-input" type="number" min="500" max="200000" /></label>
+          <label><span class="m-label">Request timeout (seconds)</span><input id="aic-timeout" class="m-input" type="number" min="5" max="300" /></label>
+          <label><span class="m-label">Input limit per request (characters)</span><input id="aic-maxchars" class="m-input" type="number" min="500" max="200000" /></label>
         </div>
       </details>
       <div id="aic-msg" class="aip-msg"></div>
       <div class="modal-actions">
-        <button id="aic-clear" title="删除本机保存的 AI 配置，回到以连接配置为准">清除本机配置</button>
-        <button id="aic-test">测试连接</button>
-        <button id="aic-cancel">取消</button>
-        <button id="aic-save" class="primary">保存</button>
+        <button id="aic-clear" title="Remove local AI settings and use connection settings">Clear Local Settings</button>
+        <button id="aic-test">Test Connection</button>
+        <button id="aic-cancel">Cancel</button>
+        <button id="aic-save" class="primary">Save</button>
       </div>
     </div>
   </div>

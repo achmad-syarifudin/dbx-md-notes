@@ -94,7 +94,7 @@
   }
 
   function errText(e) {
-    if (!e) { return "未知错误"; }
+    if (!e) { return "Unknown error"; }
     if (typeof e === "string") { return e; }
     if (e.message) { return String(e.message); }
     if (e.error) { return String(e.error); }
@@ -122,34 +122,34 @@
   function report() {
     var st = status;
     var L = [];
-    L.push("=== DBX AI.MD 笔记 · 存储诊断报告 ===");
-    L.push("时间：" + new Date().toLocaleString("zh-CN"));
-    L.push("UI 版本：" + UI_VERSION);
-    L.push("页面：" + (function () { try { return String(location.href); } catch (e) { return "?"; } })());
-    L.push("UA：" + navigator.userAgent);
+    L.push("=== DBX AI.MD Notes · Storage Diagnostic Report ===");
+    L.push("Time: " + new Date().toLocaleString("en-US"));
+    L.push("UI version: " + UI_VERSION);
+    L.push("Page: " + (function () { try { return String(location.href); } catch (e) { return "?"; } })());
+    L.push("UA: " + navigator.userAgent);
     L.push("");
-    L.push("--- 环境 ---");
+    L.push("--- Environment ---");
     L.push(envSnapshot());
     L.push("");
-    L.push("--- 状态 ---");
+    L.push("--- Status ---");
     L.push("backend=" + st.backend + " · persistent=" + st.persistent + " · ok=" + st.ok
       + " · available=" + st.available);
     L.push("hostAvailable=" + st.hostAvailable + " · sidecarAvailable=" + st.sidecarAvailable);
-    L.push("connectionId=" + (st.connectionId || "(空)"));
-    L.push("storageDir=" + (st.storageDir || "(空)") + " · dirConfigured=" + st.dirConfigured);
-    L.push("storagePath=" + (st.storagePath || "(空)"));
-    L.push("sidecarError=" + (st.sidecarError || "(无)"));
-    L.push("lastError=" + (st.lastError || "(无)"));
+    L.push("connectionId=" + (st.connectionId || "(empty)"));
+    L.push("storageDir=" + (st.storageDir || "(empty)") + " · dirConfigured=" + st.dirConfigured);
+    L.push("storagePath=" + (st.storagePath || "(empty)"));
+    L.push("sidecarError=" + (st.sidecarError || "(none)"));
+    L.push("lastError=" + (st.lastError || "(none)"));
     L.push("payloadBytes=" + st.payloadBytes + " · lastSavedAt="
-      + (st.lastSavedAt ? new Date(st.lastSavedAt).toLocaleString("zh-CN") : "(尚无)"));
+      + (st.lastSavedAt ? new Date(st.lastSavedAt).toLocaleString("en-US") : "(not yet)"));
     L.push("");
-    L.push("--- 诊断日志（" + diag.length + " 条，最早在上）---");
-    L.push(diagLines().join("\n") || "(无)");
+    L.push("--- Diagnostic Log (" + diag.length + " entries, oldest first) ---");
+    L.push(diagLines().join("\n") || "(none)");
     return L.join("\n");
   }
 
   // 模块加载即落一条，确保「即使 UI 完全没启动」诊断条里也有东西可看。
-  note("存储模块加载完成（等待 UI 调用 init）", null, "UI 版本 " + UI_VERSION);
+  note("Storage module loaded (waiting for UI to call init)", null, "UI version " + UI_VERSION);
 
   /* ============================ 状态 ============================ */
 
@@ -193,7 +193,7 @@
   function withTimeout(promise, ms, msg) {
     var timer = null;
     var gate = new Promise(function (_, reject) {
-      timer = setTimeout(function () { reject(new Error(msg + "（" + ms + "ms 未响应）")); }, ms);
+      timer = setTimeout(function () { reject(new Error(msg + " (no response after " + ms + "ms)")); }, ms);
     });
     function clear() { if (timer) { clearTimeout(timer); timer = null; } }
     return Promise.race([Promise.resolve(promise), gate]).then(
@@ -237,9 +237,9 @@
   function waitReady(a) {
     if (apiReady) { return Promise.resolve(true); }
     var ready = (a && a.ready && typeof a.ready.then === "function") ? a.ready : Promise.resolve();
-    return settle(withTimeout(ready, READY_TIMEOUT, "等待宿主 dbxPlugin.ready")).then(function (r) {
+    return settle(withTimeout(ready, READY_TIMEOUT, "Waiting for host dbxPlugin.ready")).then(function (r) {
       apiReady = r.ok;
-      note("宿主桥接 ready（dbxPlugin.ready）", r.ok, r.ok ? "已收到宿主 init 消息" : errText(r.error));
+      note("Host bridge ready (dbxPlugin.ready)", r.ok, r.ok ? "Received host init message" : errText(r.error));
       return r.ok;
     });
   }
@@ -249,26 +249,26 @@
     var sync = null;
     try { sync = a && a.context; } catch (e) { sync = null; }
     if (sync && typeof sync === "object" && Object.keys(sync).length) {
-      note("工作台上下文（同步 dbxPlugin.context）", true, describeCtx(sync));
+      note("Workspace context (synchronous dbxPlugin.context)", true, describeCtx(sync));
       return Promise.resolve(sync);
     }
     if (a && typeof a.request === "function") {
-      return settle(withTimeout(a.request("host.getContext", {}), CTX_TIMEOUT, "请求 host.getContext"))
+      return settle(withTimeout(a.request("host.getContext", {}), CTX_TIMEOUT, "Requesting host.getContext"))
         .then(function (r) {
           var ctx = (r.ok && r.value && typeof r.value === "object") ? r.value : {};
           var has = Object.keys(ctx).length > 0;
-          note("工作台上下文（兜底 host.getContext）", r.ok && has,
+          note("Workspace context (fallback host.getContext)", r.ok && has,
             r.ok ? describeCtx(ctx) : errText(r.error));
           return ctx;
         });
     }
-    note("工作台上下文", false, "宿主既未提供同步 context，也无 request 方法");
+    note("Workspace context", false, "Host provides neither synchronous context nor request method");
     return Promise.resolve({});
   }
 
   function describeCtx(ctx) {
     var keys = Object.keys(ctx || {});
-    return "字段 [" + keys.slice(0, 8).join(", ") + (keys.length > 8 ? ", …" : "") + "]";
+    return "Fields [" + keys.slice(0, 8).join(", ") + (keys.length > 8 ? ", …" : "") + "]";
   }
 
   /** 从上下文里尽力取 connectionId / storage_dir（取不到也不影响落盘，见文件头说明） */
@@ -315,7 +315,7 @@
 
   function rpcRaw(method, params, timeoutMs) {
     if (!client || !client.api || typeof client.api.invoke !== "function") {
-      return Promise.reject(new Error("侧车通道未就绪（宿主未提供 dbxPlugin.invoke）"));
+      return Promise.reject(new Error("Sidecar channel not ready (host did not provide dbxPlugin.invoke)"));
     }
     var payload = {};
     if (client.connectionId) { payload.connectionId = client.connectionId; }
@@ -326,7 +326,7 @@
     try {
       out = client.api.invoke(method, payload, { timeoutMs: timeoutMs || RPC_TIMEOUT });
     } catch (e) {
-      return Promise.reject(new Error(method + " 调用失败：" + errText(e)));
+      return Promise.reject(new Error(method + " call failed: " + errText(e)));
     }
     return Promise.resolve(out);
   }
@@ -340,7 +340,7 @@
     var ms = function () { return (since() - started).toFixed(0) + "ms"; };
     return rpcRaw(method, params, timeoutMs).then(function (res) {
       if (res && typeof res === "object" && res.error && !res.ok && !res.data) {
-        note("侧车调用 " + method, false, ms() + " · " + errText(res.error));
+        note("Sidecar call " + method, false, ms() + " · " + errText(res.error));
         throw new Error(errText(res.error));
       }
       var out = res;
@@ -348,10 +348,10 @@
         && res.ok === undefined && res.data === undefined && res.path === undefined && res.dir === undefined) {
         out = res.result;
       }
-      note("侧车调用 " + method, true, ms());
+      note("Sidecar call " + method, true, ms());
       return out;
     }, function (err) {
-      note("侧车调用 " + method, false, ms() + " · " + errText(err));
+      note("Sidecar call " + method, false, ms() + " · " + errText(err));
       throw err;
     });
   }
@@ -433,7 +433,7 @@
       };
     }).catch(function (err) {
       setStatus({ ok: false, lastError: errText(err) });
-      note("读取笔记", false, errText(err));
+      note("Read notes", false, errText(err));
       return {
         data: null, pending: null,
         backend: current ? current.name : "memory",
@@ -460,19 +460,19 @@
   function init() {
     initCalled = true;
     initStartedAt = since();
-    note("=== 存储初始化开始 ===", null, UI_VERSION + " @ " + new Date().toLocaleTimeString("zh-CN"));
-    note("环境快照", null, envSnapshot());
+    note("=== Storage initialization started ===", null, UI_VERSION + " @ " + new Date().toLocaleTimeString("en-US"));
+    note("Environment snapshot", null, envSnapshot());
     return waitBridge(BRIDGE_TIMEOUT).then(function (a) {
-      note("等 window.dbxPlugin 注入", !!a, (since() - initStartedAt).toFixed(0) + "ms"
-        + (a ? " · 已拿到" : " · 超时 " + BRIDGE_TIMEOUT + "ms"));
+      note("Waiting for window.dbxPlugin injection", !!a, (since() - initStartedAt).toFixed(0) + "ms"
+        + (a ? " · available" : " · timed out after " + BRIDGE_TIMEOUT + "ms"));
       if (!a) {
-        var msg = "宿主未注入 window.dbxPlugin（当前不在 DBX 插件工作台内）";
-        note("获取 dbxPlugin 桥接", false, msg);
+        var msg = "Host did not inject window.dbxPlugin (not in DBX plugin workspace)";
+        note("Acquire dbxPlugin bridge", false, msg);
         setStatus({ hostAvailable: false, fsSupported: fsSupported() });
         failHard(msg);
         return fallbackResult(msg);
       }
-      note("获取 dbxPlugin 桥接", true, "已有 invoke=" + (typeof a.invoke) + " request=" + (typeof a.request));
+      note("Acquire dbxPlugin bridge", true, "Available invoke=" + (typeof a.invoke) + " request=" + (typeof a.request));
       setStatus({ hostAvailable: true, fsSupported: fsSupported() });
 
       return waitReady(a).then(function () {
@@ -484,8 +484,8 @@
           storageDir: info.storageDir,
           storagePath: info.storageDir
         });
-        note("解析连接上下文", !!info.connectionId || !!info.storageDir,
-          "connectionId=" + (info.connectionId || "（无）") + " storage_dir=" + (info.storageDir || "（无，侧车侧自持）"));
+        note("Parse connection context", !!info.connectionId || !!info.storageDir,
+          "connectionId=" + (info.connectionId || "(none)") + " storage_dir=" + (info.storageDir || "(none; managed by sidecar)"));
 
         client = { api: a, connectionId: info.connectionId, storageDir: info.storageDir };
 
@@ -506,17 +506,17 @@
         }
 
         // —— 侧车握手：这才是真正的可用性判据 ——
-        return settle(withTimeout(rpc("notes/ping", {}, PING_TIMEOUT), PING_TIMEOUT + 500, "侧车握手 notes/ping"))
+        return settle(withTimeout(rpc("notes/ping", {}, PING_TIMEOUT), PING_TIMEOUT + 500, "Sidecar handshake notes/ping"))
           .then(function (r) {
             if (!r.ok) {
-              var why = "侧车不可用：" + errText(r.error);
-              note("侧车握手 notes/ping", false, errText(r.error));
+              var why = "Sidecar unavailable: " + errText(r.error);
+              note("Sidecar handshake notes/ping", false, errText(r.error));
               failHard(why);
               return fallbackResult(why);
             }
             var pl = r.value || {};
-            note("侧车握手 notes/ping", true,
-              "version=" + (pl.version || "?") + " dir=" + (pl.storagePath || pl.dir || "（未回报）")
+            note("Sidecar handshake notes/ping", true,
+              "version=" + (pl.version || "?") + " dir=" + (pl.storagePath || pl.dir || "(not reported)")
               + " configured=" + (pl.configured === true));
 
             current = sidecarBackend();
@@ -532,7 +532,7 @@
             // 若上下文里读到了 storage_dir，额外告知侧车做兜底（侧车自己也有 config.json）
             if (info.storageDir) {
               settle(rpc("notes/setDir", { dir: info.storageDir }, PING_TIMEOUT)).then(function (s) {
-                note("同步存储目录到侧车 notes/setDir", s.ok,
+                note("Sync storage directory to sidecar notes/setDir", s.ok,
                   s.ok ? ((s.value && s.value.dir) || info.storageDir) : errText(s.error));
                 if (s.ok && s.value) {
                   setStatus({
@@ -547,15 +547,15 @@
               r.connectionId = status.connectionId;
               r.storageDir = status.storageDir;
               r.path = status.storagePath;
-              note("读取笔记 notes/load", true,
-                "节点数=" + ((r.data && r.data.nodes && r.data.nodes.length) || 0) + " firstRun=" + r.firstRun);
+              note("Read notes notes/load", true,
+                "Node count=" + ((r.data && r.data.nodes && r.data.nodes.length) || 0) + " firstRun=" + r.firstRun);
               return r;
             });
           });
       });
     }).catch(function (err) {
-      var msg = "存储初始化异常：" + errText(err);
-      note("存储初始化", false, errText(err));
+      var msg = "Storage initialization error: " + errText(err);
+      note("Storage initialization", false, errText(err));
       failHard(msg);
       return fallbackResult(msg);
     });
@@ -601,9 +601,9 @@
         var bytes = jsonBytes(data);
         setStatus({ payloadBytes: bytes });
         if (bytes > BRIDGE_PAYLOAD_LIMIT) {
-          var over = "笔记本整体大小 " + Math.round(bytes / 1024) + " KB 超过宿主桥接单次上限（2 MB）。"
-            + "请拆分或精简笔记内容后重试。";
-          note("notes/save 负载检查", false, over);
+          var over = "Notebook size " + Math.round(bytes / 1024) + " KB exceeds the host bridge limit (2 MB) per request. "
+            + "Split or shorten notes, then try again.";
+          note("notes/save payload check", false, over);
           return Promise.reject(new Error(over));
         }
         var extra = { data: data };
@@ -617,7 +617,7 @@
             });
           }
           note("notes/save", true,
-            Math.round(bytes / 1024) + " KB -> " + (status.storagePath || "（侧车未回报路径）"));
+            Math.round(bytes / 1024) + " KB -> " + (status.storagePath || "(sidecar did not report path)"));
           return true;
         });
       }
@@ -667,10 +667,10 @@
   /** 弹宿主原生「另存为」，把字节写到用户选的目录。返回 {ok, canceled, path, error} */
   function hostSaveFile(fileName, contentType, bytes) {
     if (!hasHostSave()) {
-      note("宿主 saveFile", false, "当前宿主没有 saveFile 能力，无法弹出保存对话框");
+      note("Host saveFile", false, "Current host lacks saveFile capability; cannot open save dialog");
       return Promise.resolve({
         ok: false, canceled: false, path: "",
-        error: "当前 DBX 宿主不支持「另存为」对话框"
+        error: "Current DBX host does not support the Save As dialog"
       });
     }
     var buf, size = 0;
@@ -678,21 +678,21 @@
       buf = toExactBuffer(bytes);
       size = buf.byteLength;
     } catch (e) {
-      note("宿主 saveFile", false, "字节准备失败：" + errText(e));
+      note("Host saveFile", false, "Failed to prepare bytes: " + errText(e));
       return Promise.resolve({ ok: false, canceled: false, path: "", error: errText(e) });
     }
     var opts = { fileName: fileName, contentType: contentType };
     return Promise.resolve(api.saveFile(opts, buf)).then(function (res) {
       // 宿主文档：用户取消时 resolve null
       if (res === null || res === undefined) {
-        note("宿主 saveFile", null, "用户取消了保存：" + fileName);
-        return { ok: false, canceled: true, path: "", error: "已取消" };
+        note("Host saveFile", null, "User canceled save: " + fileName);
+        return { ok: false, canceled: true, path: "", error: "Canceled" };
       }
       var p = (res && typeof res.path === "string") ? res.path : "";
-      note("宿主 saveFile", true, fileName + "（" + size + " B）-> " + (p || "(宿主未回传路径)"));
+      note("Host saveFile", true, fileName + " (" + size + " B) -> " + (p || "(host did not return path)"));
       return { ok: true, canceled: false, path: p, error: "" };
     }).catch(function (e) {
-      note("宿主 saveFile", false, fileName + "：" + errText(e));
+      note("Host saveFile", false, fileName + ": " + errText(e));
       return { ok: false, canceled: false, path: "", error: errText(e) };
     });
   }
@@ -749,7 +749,7 @@
 
     /** 手动指定笔记存储目录（走侧车 notes/setDir） */
     setDir: function (dir) {
-      if (!nonEmptyStr(dir)) { return Promise.resolve({ ok: false, error: "目录为空" }); }
+      if (!nonEmptyStr(dir)) { return Promise.resolve({ ok: false, error: "Directory is empty" }); }
       return settle(rpc("notes/setDir", { dir: dir }, PING_TIMEOUT)).then(function (r) {
         if (!r.ok) {
           note("notes/setDir", false, errText(r.error));
@@ -772,7 +772,7 @@
       if (!fsSupported()) {
         return Promise.resolve({
           ok: false,
-          error: "当前环境不允许前端访问本地目录（沙箱 iframe 内无磁盘权限），笔记由侧车写入存储目录"
+          error: "This environment does not allow frontend access to local directories (sandboxed iframe has no disk permission); the sidecar writes notes to the storage directory"
         });
       }
       return window.showDirectoryPicker({ mode: "readwrite" }).then(function (h) {
@@ -783,10 +783,10 @@
           backend: "folder", persistent: true, available: true, ok: true,
           lastError: "", folderName: fsState.name, backupOnly: false
         });
-        note("选择本地目录", true, fsState.name);
+        note("Select local directory", true, fsState.name);
         return { ok: true, name: fsState.name };
       }).catch(function (e) {
-        return { ok: false, error: errText(e) || "已取消或不被允许" };
+        return { ok: false, error: errText(e) || "Canceled or not permitted" };
       });
     },
 
@@ -912,7 +912,7 @@
       }).catch(function (err) {
         // 侧车写失败：尝试重连一次再重试（宿主可能重启过侧车）
         if (target.name === "sidecar") {
-          return settle(withTimeout(rpc("notes/ping", {}, PING_TIMEOUT), PING_TIMEOUT + 500, "重连侧车"))
+          return settle(withTimeout(rpc("notes/ping", {}, PING_TIMEOUT), PING_TIMEOUT + 500, "Reconnect sidecar"))
             .then(function (r) {
               if (r.ok) { return target.write(data); }
               throw err;
@@ -928,7 +928,7 @@
         }
         var m = errText(err);
         setStatus({ ok: false, lastError: m });
-        note("写入笔记", false, m);
+        note("Write notes", false, m);
         return false;
       });
     },
@@ -947,7 +947,7 @@
       return new Promise(function (resolve, reject) {
         var r = new FileReader();
         r.onload = function () { resolve(String(r.result)); };
-        r.onerror = function () { reject(r.error || new Error("读取文件失败")); };
+        r.onerror = function () { reject(r.error || new Error("Failed to read file")); };
         r.readAsText(file);
       });
     },
@@ -964,7 +964,7 @@
           }
           resolve(btoa(s));
         };
-        r.onerror = function () { reject(r.error || new Error("读取文件失败")); };
+        r.onerror = function () { reject(r.error || new Error("Failed to read file")); };
         r.readAsArrayBuffer(file);
       });
     },
@@ -983,12 +983,12 @@
     setTimeout(function () {
       try {
         if (!initCalled) {
-          note("看门狗 +" + (ms / 1000) + "s", false,
-            "存储模块已加载 " + (ms / 1000) + " 秒，但 init() 从未被调用 "
-            + "→ UI 启动在更早的位置中断（往下看是否有「前端启动中断 / 页面 JS 错误」）");
+          note("Watchdog +" + (ms / 1000) + "s", false,
+            "Storage module loaded " + (ms / 1000) + " seconds ago, but init() was never called "
+            + "→ UI startup stopped earlier (check below for 'Frontend startup interrupted / Page JS error')");
         } else if (status.backend === "unknown") {
-          note("看门狗 +" + (ms / 1000) + "s", false,
-            "存储初始化仍未出结果（backend 仍为 unknown），最后一条日志即卡住的位置");
+          note("Watchdog +" + (ms / 1000) + "s", false,
+            "Storage initialization has not completed (backend still unknown); last log entry shows where it stalled");
         }
       } catch (e) { /* ignore */ }
     }, ms);

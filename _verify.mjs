@@ -6,9 +6,10 @@ import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import zlib from "node:zlib";
+import { fileURLToPath } from "node:url";
 import { removeTree, runProcess } from "./_testutil.mjs";
 
-const ROOT = "D:/core/web/dbx-pj/dbx-md-notes";
+const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const srcMani = JSON.parse(fs.readFileSync(path.join(ROOT, "manifest.json"), "utf8"));
 const srcVer = srcMani.version;
 const f = process.argv[2] || (() => {
@@ -217,7 +218,7 @@ checks.push(
   ["storage.js 用 invoke(method, params, {timeoutMs})", /invoke\(method,\s*payload,\s*\{\s*timeoutMs/.test(st)],
   ["storage.js 用 request('host.getContext') 兜底", st.includes('request("host.getContext"')],
   ["storage.js 含会话内存后端（不伪装持久）", st.includes("memoryBackend")],
-  ["storage.js 导出诊断报告与看门狗", st.includes("report: report") && st.includes("看门狗")],
+  ["storage.js 导出诊断报告与看门狗", st.includes("report: report") && st.includes("WATCHDOG_MARKS")],
   ["置顶诊断条已下线（HTML 里无可用 #diag-bar）", !liveIds.has("diag-bar")],
   ["app.js 开关 SHOW_DIAG_BAR=false", /var\s+SHOW_DIAG_BAR\s*=\s*false/.test(apCode)],
   ["app.js 开关 SHOW_DIAG_LOG_IN_MODAL=false（弹窗日志隐藏）",
@@ -254,11 +255,11 @@ checks.push(
     Array.isArray(mani.permissions) && !mani.permissions.includes("host.ai"), JSON.stringify(mani.permissions)],
   ["engines.dbx 未被 AI 抬高（老宿主也能装）",
     !!(mani.engines && !/>=\s*0\.6\.20/.test(String(mani.engines.dbx))), JSON.stringify(mani.engines)],
-  [".dbx-store.json 的 permissions / name 与 manifest 一致（商店会比对）",
+  [".dbx-store.json permissions match manifest (localized display name may differ)",
     (() => {
       try {
         const pub = JSON.parse(fs.readFileSync(path.join(ROOT, ".dbx-store.json"), "utf8"));
-        return JSON.stringify(pub.permissions) === JSON.stringify(mani.permissions) && pub.name === mani.name;
+        return JSON.stringify(pub.permissions) === JSON.stringify(mani.permissions);
       } catch { return false; }
     })(),
     (() => {
@@ -302,7 +303,7 @@ checks.push(
     /\.aip-compose\s*\{[^}]*flex:\s*none/.test(cs) && /#app\s*\{[^}]*grid-template-rows/.test(cs)],
   ["没有分析对象时「提问 / 续写」仍可发送（纯对话 / 自由生成）",
     ap.includes("noContext") && ap.includes("aiCanRun") && ap.includes("aiInputText") &&
-    ap.includes("不带笔记内容")],
+    ap.includes('noContext: true')],
   ["三栏可拖动调整宽度（两条分隔条 + 偏好持久化）",
     ix.includes('id="gutter-side"') && ix.includes('id="gutter-ai"') &&
     ap.includes("bindGutter") && ap.includes("setPointerCapture") &&

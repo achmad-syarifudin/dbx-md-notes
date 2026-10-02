@@ -2,10 +2,10 @@
   "$schema": "https://raw.githubusercontent.com/t8y2/dbx/main/plugins/manifest.schema.json",
   "manifest_version": 1,
   "id": "com.lwai.mdnotes",
-  "name": "AI.MD 笔记",
+  "name": "AI.MD Notes",
   "version": "0.8.4",
   "publisher": "lwai",
-  "description": "Markdown 笔记，支持连接类型：在 DBX 中新建「AI.MD 笔记」连接即可打开笔记工作台。笔记落盘到连接配置里的存储目录，并可作为 mdnotes:// 虚拟文件系统浏览编辑。内置 AI 助手（右侧常驻栏），可接入任意 OpenAI 兼容 / Anthropic / Ollama 模型对笔记做分析、润色、续写与问答。",
+  "description": "Markdown notes connection type: create an AI.MD Notes connection to open the notebook workbench. Notes are persisted into the configured storage directory as real .md files and can be browsed and edited via the mdnotes:// virtual filesystem. Built-in AI assistant supports note analysis, polishing, continuation, and Q&A with OpenAI-compatible, Anthropic, or Ollama models.",
   "icon": "assets/plugin.svg",
   "engines": {
     "dbx": ">=0.5.68",
@@ -27,15 +27,15 @@
     {
       "type": "workbench",
       "id": "com.lwai.mdnotes.main",
-      "label": "AI.MD 笔记",
-      "description": "Markdown 笔记工作台",
+      "label": "AI.MD Notes",
+      "description": "Markdown notes workbench",
       "icon": "assets/plugin.svg"
     },
     {
       "type": "connection-provider",
       "id": "com.lwai.mdnotes.conn",
-      "label": "AI.MD 笔记",
-      "description": "创建一个 AI.MD 笔记连接，用于打开独立的 Markdown 笔记工作台。",
+      "label": "AI.MD Notes",
+      "description": "Create an AI.MD Notes connection to open a standalone Markdown notebook workbench.",
       "icon": "assets/plugin.svg",
       "database_type": "mdnotes",
       "workbench": "com.lwai.mdnotes.main",
@@ -47,55 +47,55 @@
       "fields": [
         {
           "key": "display_name",
-          "label": "连接名称",
+          "label": "Connection name",
           "type": "text",
           "binding": "name",
           "required": true,
-          "default": "AI.MD 笔记",
-          "description": "显示在连接列表中的名称。"
+          "default": "AI.MD Notes",
+          "description": "Name shown in the connection list."
         },
         {
           "key": "storage_dir",
-          "label": "笔记存储目录",
+          "label": "Notes storage directory",
           "type": "text",
           "binding": "config",
           "required": true,
           "default": "",
-          "placeholder": "例如：D:\\notes",
-          "description": "必填。Sidecar 会把每条笔记写成该目录下的真实 .md 文件、文件夹写成子目录，结构索引存于 .mdnotes/meta.json。点击右侧文件夹按钮选择本地目录，或手动填写绝对路径。",
+          "placeholder": "e.g. /Users/me/notes or D:\\notes",
+          "description": "Required. The sidecar writes each note as a real .md file and each folder as a subfolder under this directory; the structure index is stored in .mdnotes/meta.json. Click the folder button to pick a local directory, or type an absolute path.",
           "picker": {
             "kind": "directory"
           }
         },
         {
           "key": "ai_enabled",
-          "label": "启用 AI 功能",
+          "label": "Enable AI features",
           "type": "boolean",
           "binding": "config",
           "default": false,
-          "description": "开启后工作台右侧会出现 AI 助手栏，可对笔记做分析、润色、续写与问答。关闭时下面的 AI 配置项不显示，也不会发起任何外部请求。这里的配置是初始值，之后可在工作台的 AI 助手栏里直接修改。"
+          "description": "When enabled, an AI assistant panel appears on the right of the workbench for note analysis, polishing, continuation, and Q&A. When disabled, subsequent AI settings are hidden and no external requests are made. Initial configuration can be edited directly inside the workbench AI panel."
         },
         {
           "key": "ai_provider",
-          "label": "AI 服务提供方",
+          "label": "AI provider",
           "type": "select",
           "binding": "config",
           "default": "openai",
           "options": [
             {
-              "label": "OpenAI 兼容（DeepSeek / 通义 / Kimi / 自建网关）",
+              "label": "OpenAI-compatible (DeepSeek / Qwen / Kimi / custom gateway)",
               "value": "openai"
             },
             {
-              "label": "Anthropic（Claude）",
+              "label": "Anthropic (Claude)",
               "value": "anthropic"
             },
             {
-              "label": "Ollama（本地模型）",
+              "label": "Ollama (local models)",
               "value": "ollama"
             }
           ],
-          "description": "选择接口协议。绝大多数国产模型与自建网关都兼容 OpenAI 协议。",
+          "description": "Select API protocol. Most domestic models and self-hosted gateways are OpenAI-compatible.",
           "visible_when": {
             "field": "ai_enabled",
             "one_of": [
@@ -105,12 +105,12 @@
         },
         {
           "key": "ai_base_url",
-          "label": "API 地址",
+          "label": "API base URL",
           "type": "text",
           "binding": "config",
           "default": "",
           "placeholder": "https://api.deepseek.com/v1",
-          "description": "服务根地址（不含 /chat/completions）。Ollama 本地默认 http://127.0.0.1:11434/v1。",
+          "description": "Service root URL without /chat/completions. Ollama defaults locally to http://127.0.0.1:11434/v1.",
           "visible_when": {
             "field": "ai_enabled",
             "one_of": [
@@ -120,12 +120,12 @@
         },
         {
           "key": "ai_model",
-          "label": "模型名称",
+          "label": "Model name",
           "type": "text",
           "binding": "config",
           "default": "",
           "placeholder": "deepseek-chat",
-          "description": "按服务方文档填写，例如 deepseek-chat、gpt-4o-mini、qwen2.5:7b。",
+          "description": "Model identifier from provider docs, e.g. deepseek-chat, gpt-4o-mini, qwen2.5:7b.",
           "visible_when": {
             "field": "ai_enabled",
             "one_of": [
@@ -135,11 +135,11 @@
         },
         {
           "key": "ai_api_key",
-          "label": "API 密钥",
+          "label": "API key",
           "type": "password",
           "binding": "secret",
           "default": "",
-          "description": "保存在 DBX 的密钥存储中，只发给插件后端，不会写进笔记目录、日志或缓存。留空表示不修改已保存的密钥。Ollama 本地模型可留空。",
+          "description": "Stored securely in DBX secret storage and sent only to the plugin backend; never written to note files, logs, or cache. Leave empty to keep existing key. Local Ollama models can leave this blank.",
           "visible_when": {
             "field": "ai_enabled",
             "one_of": [
@@ -149,11 +149,11 @@
         },
         {
           "key": "ai_system_prompt",
-          "label": "自定义人设（可选）",
+          "label": "Custom system prompt (optional)",
           "type": "textarea",
           "binding": "config",
           "default": "",
-          "description": "留空则使用内置提示词。填了会替换掉默认人设。",
+          "description": "Leave blank to use the built-in system prompt. Any text entered here replaces the default persona.",
           "visible_when": {
             "field": "ai_enabled",
             "one_of": [
@@ -163,11 +163,11 @@
         },
         {
           "key": "ai_timeout_secs",
-          "label": "单次超时（秒）",
+          "label": "Request timeout (seconds)",
           "type": "number",
           "binding": "config",
           "default": 60,
-          "description": "模型响应较慢时可调大。范围 5–300。",
+          "description": "Increase for slower models. Allowed range: 5–300.",
           "visible_when": {
             "field": "ai_enabled",
             "one_of": [
@@ -177,11 +177,11 @@
         },
         {
           "key": "ai_max_chars",
-          "label": "单次送入上限（字符）",
+          "label": "Max input characters per request",
           "type": "number",
           "binding": "config",
           "default": 12000,
-          "description": "超过部分会被截断（界面会提示），避免超出模型上下文。范围 500–200000。",
+          "description": "Text exceeding this limit is truncated with a UI notice to stay within context windows. Allowed range: 500–200000.",
           "visible_when": {
             "field": "ai_enabled",
             "one_of": [
@@ -193,8 +193,8 @@
       "actions": [
         {
           "id": "test-ai",
-          "label": "测试 AI 连接",
-          "description": "用当前填写的地址 / 密钥 / 模型发一次最小请求，确认能通再保存。",
+          "label": "Test AI connection",
+          "description": "Sends a minimal request using the current endpoint, key, and model to confirm connectivity before saving.",
           "variant": "outline",
           "when": "always",
           "requires_valid_form": false,
@@ -205,8 +205,8 @@
     {
       "type": "filesystem-provider",
       "id": "com.lwai.mdnotes.fs",
-      "label": "AI.MD 笔记",
-      "description": "把笔记以 .md 文件形式暴露给 DBX 通用文件管理器（mdnotes://）。",
+      "label": "AI.MD Notes",
+      "description": "Expose notes as .md files in the DBX file manager (mdnotes://).",
       "icon": "assets/plugin.svg",
       "schemes": [
         "mdnotes"
@@ -222,32 +222,66 @@
     }
   ],
   "localizations": {
-    "en": {
-      "name": "AI.MD Notes",
-      "description": "Markdown notes connection type: create an AI.MD Notes connection to open the notebook workbench. Notes are persisted by the sidecar into the storage directory and exposed as an mdnotes:// virtual filesystem.",
+    "zh-CN": {
+      "name": "AI.MD 笔记",
+      "description": "Markdown 笔记，支持连接类型：在 DBX 中新建「AI.MD 笔记」连接即可打开笔记工作台。笔记落盘到连接配置里的存储目录，并可作为 mdnotes:// 虚拟文件系统浏览编辑。内置 AI 助手（右侧常驻栏），可接入任意 OpenAI 兼容 / Anthropic / Ollama 模型对笔记做分析、润色、续写与问答。",
       "contributions": {
         "com.lwai.mdnotes.main": {
-          "label": "AI.MD Notes",
-          "description": "Markdown notes workbench"
+          "label": "AI.MD 笔记",
+          "description": "Markdown 笔记工作台"
         },
         "com.lwai.mdnotes.conn": {
-          "label": "AI.MD Notes",
-          "description": "Create an AI.MD Notes connection to open a standalone Markdown notebook workbench.",
+          "label": "AI.MD 笔记",
+          "description": "创建一个 AI.MD 笔记连接，用于打开独立的 Markdown 笔记工作台。",
           "fields": {
             "display_name": {
-              "label": "Connection name",
-              "description": "Name shown in the connection list."
+              "label": "连接名称",
+              "description": "显示在连接列表中的名称。"
             },
             "storage_dir": {
-              "label": "Storage directory",
-              "description": "Required. The sidecar writes each note as a real .md file and each folder as a subfolder under this directory; the structure index is stored in .mdnotes/meta.json. Click the folder button to pick a local directory, or type an absolute path.",
-              "placeholder": "e.g. /Users/me/notes"
+              "label": "笔记存储目录",
+              "description": "必填。Sidecar 会把每条笔记写成该目录下的真实 .md 文件、文件夹写成子目录，结构索引存于 .mdnotes/meta.json。点击右侧文件夹按钮选择本地目录，或手动填写绝对路径。",
+              "placeholder": "例如：D:\\notes"
+            },
+            "ai_enabled": {
+              "label": "启用 AI 功能",
+              "description": "开启后工作台右侧会出现 AI 助手栏，可对笔记做分析、润色、续写与问答。关闭时下面的 AI 配置项不显示，也不会发起任何外部请求。这里的配置是初始值，之后可在工作台的 AI 助手栏里直接修改。"
+            },
+            "ai_provider": {
+              "label": "AI 服务提供方",
+              "description": "选择接口协议。绝大多数国产模型与自建网关都兼容 OpenAI 协议。"
+            },
+            "ai_base_url": {
+              "label": "API 地址",
+              "description": "服务根地址（不含 /chat/completions）。Ollama 本地默认 http://127.0.0.1:11434/v1。",
+              "placeholder": "https://api.deepseek.com/v1"
+            },
+            "ai_model": {
+              "label": "模型名称",
+              "description": "按服务方文档填写，例如 deepseek-chat、gpt-4o-mini、qwen2.5:7b。",
+              "placeholder": "deepseek-chat"
+            },
+            "ai_api_key": {
+              "label": "API 密钥",
+              "description": "保存在 DBX 的密钥存储中，只发给插件后端，不会写进笔记目录、日志或缓存。留空表示不修改已保存的密钥。Ollama 本地模型可留空。"
+            },
+            "ai_system_prompt": {
+              "label": "自定义人设（可选）",
+              "description": "留空则使用内置提示词。填了会替换掉默认人设。"
+            },
+            "ai_timeout_secs": {
+              "label": "单次超时（秒）",
+              "description": "模型响应较慢时可调大。范围 5–300。"
+            },
+            "ai_max_chars": {
+              "label": "单次送入上限（字符）",
+              "description": "超过部分会被截断（界面会提示），避免超出模型上下文。范围 500–200000。"
             }
           }
         },
         "com.lwai.mdnotes.fs": {
-          "label": "AI.MD Notes",
-          "description": "Expose notes as .md files in the DBX file manager (mdnotes://)."
+          "label": "AI.MD 笔记",
+          "description": "把笔记以 .md 文件形式暴露给 DBX 通用文件管理器（mdnotes://）。"
         }
       }
     }

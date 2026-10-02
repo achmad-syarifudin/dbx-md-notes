@@ -18,12 +18,13 @@
 //   dist/release-candidates.json
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { runProcess } from "./_testutil.mjs";
 
-const ROOT = "D:/core/web/dbx-pj/dbx-md-notes";
+const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const BINARY = "dbx-plugin-mdnotes";
-const GO = process.env.DBX_GO || "D:/apply/go1.25/bin/go.exe";
-const GOROOT = process.env.DBX_GOROOT || "D:/apply/go1.25";
+const GO = process.env.DBX_GO || "go";
+const GOROOT = process.env.DBX_GOROOT;
 const NODE = process.execPath;
 
 // target → Go 工具链三元组（官方 current_target() 的命名：darwin/linux/windows + arm64/x64）
@@ -71,20 +72,20 @@ console.log(`=== 构建 ${list.length} 个平台：${list.join(", ")} ===\n`);
 for (const t of list) {
   const [goos, goarch] = TRIPLES[t];
   // 注意：`go build -C backend` 会先切到 backend/，所以 -o 是相对 backend/ 的。
-  const outArg = t === "windows-x64"
-    ? `${BINARY}.exe`                                        // 本机产物，e2e 也读这份
-    : `../_xbuild/${BINARY}-${goos}-${goarch}`;
+  const outArg = `../_xbuild/${BINARY}-${goos}-${goarch}${goos === "windows" ? ".exe" : ""}`;
   const shown = outArg.replace(/^\.\.\//, "");
   process.stdout.write(`[build] ${t.padEnd(13)} GOOS=${goos} GOARCH=${goarch} -> ${shown}\n`);
   await run(GO, ["build", "-C", "backend", "-o", outArg, "."], {
-    env: { ...process.env, GOROOT, CGO_ENABLED: "0", GOOS: goos, GOARCH: goarch },
+    env: { ...process.env, ...(GOROOT ? { GOROOT } : {}), CGO_ENABLED: "0", GOOS: goos, GOARCH: goarch },
   });
 }
 
 // ---- 2) 逐平台打包 ----
 console.log("");
 for (const t of list) {
-  await run(NODE, [path.join(ROOT, "_buildpkg.js"), "--target", t]);
+  const [goos, goarch] = TRIPLES[t];
+  const exe = path.join(ROOT, "_xbuild", `${BINARY}-${goos}-${goarch}${goos === "windows" ? ".exe" : ""}`);
+  await run(NODE, [path.join(ROOT, "_buildpkg.js"), "--target", t, "--exe", exe]);
 }
 
 // ---- 3) 逐包校验（包结构 / checksums / executable 路径与扩展名） ----

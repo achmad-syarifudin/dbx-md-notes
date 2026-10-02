@@ -29,7 +29,7 @@ const path = require("path");
 const crypto = require("crypto");
 const zlib = require("zlib");
 
-const root = "D:/core/web/dbx-pj/dbx-md-notes/";
+const root = __dirname + path.sep;
 const binary = "dbx-plugin-mdnotes";       // 与 dbx-plugin.toml [backend].binary 一致
 
 const argv = process.argv.slice(2);
@@ -61,7 +61,7 @@ function resolveExe() {
     console.error(`\n[FATAL] 未知 target：${target}。已知：${Object.keys(GO_TRIPLES).join(", ")}\n`);
     process.exit(1);
   }
-  return root + `_xbuild/${binary}-${t[0]}-${t[1]}`;
+  return root + `_xbuild/${binary}-${t[0]}-${t[1]}${t[0] === "windows" ? ".exe" : ""}`;
 }
 
 const mani = JSON.parse(fs.readFileSync(root + "manifest.json", "utf8"));

@@ -12,11 +12,12 @@ import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { removeTree } from "./_testutil.mjs";
 
-const ROOT = "D:/core/web/dbx-pj/dbx-md-notes";
-const HOST_SRC = "C:/Users/Luke-pc/AppData/Local/Temp/opencode/dbx-src/dbx-main/apps/desktop/src/lib/plugins/pluginHostBridge.ts";
-const EXE = path.join(ROOT, "backend/dbx-plugin-mdnotes.exe");
+const ROOT = path.dirname(fileURLToPath(import.meta.url));
+const HOST_SRC = process.env.DBX_HOST_SRC || "";
+const EXE = process.env.DBX_SIDECAR || path.join(ROOT, "_xbuild/dbx-plugin-mdnotes-linux-amd64");
 const TMP = path.join(ROOT, "_e2e_tmp");
 const STORAGE_DIR = path.join(TMP, "storage");
 const DATA_DIR = path.join(TMP, "data");

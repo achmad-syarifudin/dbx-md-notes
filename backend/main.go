@@ -80,11 +80,11 @@ func (plugin *plugin) Handle(
 	case "connection/test":
 		where := notesDir()
 		if err := os.MkdirAll(where, 0o755); err != nil {
-			return map[string]any{"success": false, "message": "无法写入笔记存储目录：" + err.Error()}, nil
+			return map[string]any{"success": false, "message": "Cannot write to the notes storage directory: " + err.Error()}, nil
 		}
 		return map[string]any{
 			"success": true,
-			"message": "MD 笔记已就绪，笔记将保存为存储目录下的真实 .md 文件与子文件夹。",
+			"message": "MD Notes is ready. Notes will be saved as .md files and subfolders in the storage directory.",
 		}, nil
 
 	case "connection/connect":
@@ -281,7 +281,7 @@ func (plugin *plugin) Handle(
 		case "test-ai":
 			return aiTest()
 		default:
-			return nil, badParams("未知的连接动作：%s", id)
+			return nil, badParams("Unknown connection action: %s", id)
 		}
 
 	case "filesystem/list":
@@ -560,14 +560,14 @@ func setPrefsHandler(raw json.RawMessage) (any, *dbxpluginsdk.PluginError) {
 	}
 	cur = sanitizePrefs(cur) // 归一化后再写，避免把前端传来的坏值落盘
 	if err := os.MkdirAll(dataDir(), 0o755); err != nil {
-		return nil, failed(-32012, fmt.Errorf("无法写入界面偏好：%v", err))
+		return nil, failed(-32012, fmt.Errorf("Cannot save interface preferences: %v", err))
 	}
 	b, err := json.MarshalIndent(cur, "", "  ")
 	if err != nil {
-		return nil, failed(-32012, fmt.Errorf("无法写入界面偏好：%v", err))
+		return nil, failed(-32012, fmt.Errorf("Cannot save interface preferences: %v", err))
 	}
 	if err := writeAtomic(prefsPath(), append(b, '\n')); err != nil {
-		return nil, failed(-32012, fmt.Errorf("无法写入界面偏好：%v", err))
+		return nil, failed(-32012, fmt.Errorf("Cannot save interface preferences: %v", err))
 	}
 	return map[string]any{"prefs": cur}, nil
 }
@@ -897,7 +897,7 @@ func saveNotes(raw json.RawMessage) error {
 		}
 		if err := os.Rename(abs, dst); err != nil {
 			// 移不动就【不删】：宁可留下一个孤儿文件，也不做不可逆的销毁。
-			sidecarTrace(fmt.Sprintf("notes/save trash FAILED rel=%s err=%v（已保留原文件）", old.File, err))
+			sidecarTrace(fmt.Sprintf("notes/save trash FAILED rel=%s err=%v (original file preserved)", old.File, err))
 			continue
 		}
 		trashed++
@@ -972,7 +972,7 @@ func saveNotes(raw json.RawMessage) error {
 	}
 
 	if preserved > 0 {
-		sidecarTrace(fmt.Sprintf("notes/save preserved=%d（快照里没带、但未声明删除，保持原样）", preserved))
+		sidecarTrace(fmt.Sprintf("notes/save preserved=%d (absent from snapshot but not marked for deletion)", preserved))
 	}
 
 	newMeta := Meta{Version: s.Version, ActiveID: s.ActiveID, Expanded: s.Expanded, View: s.View, Nodes: result}
@@ -1011,7 +1011,7 @@ func notesLoad() (any, *dbxpluginsdk.PluginError) {
 				// 原样保存回去，磁盘上的正文就被清空了。这里明确标记 missing，
 				// 前端据此既不显示为可编辑的空笔记、也不会把空内容写回。
 				node["contentMissing"] = true
-				sidecarTrace(fmt.Sprintf("notes/load 正文读不到（已冻结，不会写回）：rel=%s err=%v", mn.File, err))
+				sidecarTrace(fmt.Sprintf("notes/load content unreadable (frozen; will not write back): rel=%s err=%v", mn.File, err))
 			}
 			node["file"] = mn.File
 		}
@@ -1284,18 +1284,18 @@ func insideRoot(root, rel string) (string, bool) {
 func restoreNotes(dataBase64 string, dryRun bool) (any, *dbxpluginsdk.PluginError) {
 	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(dataBase64))
 	if err != nil {
-		return nil, badParams("备份内容不是合法 base64：%v", err)
+		return nil, badParams("Backup data is not valid base64: %v", err)
 	}
 	zr, err := zip.NewReader(bytes.NewReader(raw), int64(len(raw)))
 	if err != nil {
-		return nil, badParams("这不是一个有效的 zip 备份包：%v", err)
+		return nil, badParams("Not a valid ZIP backup: %v", err)
 	}
 
 	const maxEntries = 20000
 	const maxTotal = uint64(256) << 20 // 解压后总量上限 256 MiB
 	const maxFile = uint64(32) << 20   // 单个文件上限 32 MiB
 	if len(zr.File) > maxEntries {
-		return nil, badParams("备份包条目过多（%d）", len(zr.File))
+		return nil, badParams("Backup contains too many entries (%d)", len(zr.File))
 	}
 
 	root := notesDir()
@@ -1314,17 +1314,17 @@ func restoreNotes(dataBase64 string, dryRun bool) (any, *dbxpluginsdk.PluginErro
 		}
 		rel, ok := safeRelPath(f.Name)
 		if !ok {
-			return nil, badParams("备份包含不安全的路径，已拒绝：%s", f.Name)
+			return nil, badParams("Backup contains an unsafe path: %s", f.Name)
 		}
 		if _, ok := insideRoot(root, rel); !ok {
-			return nil, badParams("备份包路径越界，已拒绝：%s", f.Name)
+			return nil, badParams("Backup path escapes the storage directory: %s", f.Name)
 		}
 		total += f.UncompressedSize64
 		if total > maxTotal {
-			return nil, badParams("备份包解压后体积过大，已拒绝")
+			return nil, badParams("Backup exceeds the maximum uncompressed size")
 		}
 		if f.UncompressedSize64 > maxFile {
-			return nil, badParams("备份包内单个文件过大：%s", f.Name)
+			return nil, badParams("Backup file is too large: %s", f.Name)
 		}
 
 		switch rel {
@@ -1351,11 +1351,11 @@ func restoreNotes(dataBase64 string, dryRun bool) (any, *dbxpluginsdk.PluginErro
 	}
 
 	if len(metaBytes) == 0 {
-		return nil, badParams("这不是「MD 笔记」的备份包（缺少 %s）", backupMetaEntry)
+		return nil, badParams("Not an MD Notes backup (missing %s)", backupMetaEntry)
 	}
 	var bm Meta
 	if err := json.Unmarshal(metaBytes, &bm); err != nil {
-		return nil, badParams("备份包里的索引已损坏：%v", err)
+		return nil, badParams("Backup index is corrupt: %v", err)
 	}
 	// 备份可能来自另一个操作系统：索引里的路径分隔符按当前平台归一化，
 	// 否则「Windows 备份 → macOS 恢复」会得到一批文件名里带反斜杠的怪文件。
@@ -1919,7 +1919,7 @@ func handleNewNoteForTable(params json.RawMessage) (any, *dbxpluginsdk.PluginErr
 
 	return map[string]any{
 		"success": true,
-		"message": "已记录表：" + tableName + "，打开 MD 笔记工作台后将自动预填模板。",
+		"message": "Table recorded: " + tableName + ". Open the MD Notes workbench to prefill a note template.",
 	}, nil
 }
 
