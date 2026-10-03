@@ -1,12 +1,12 @@
 /*
- * AI.MD 笔记 主逻辑
- * 依赖（按 index.html 加载顺序）：sql-highlight.js、markdown.js、storage.js
+ * AI.MD Notes, master logic
+ * Dependency (by index.html Load order:sql-highlight.js、markdown.js、storage.js
  *
- * 本版修复：
- *  - 笔记丢失：存储层多后端探测 + 写入失败可见；仅在「确实没有任何数据」时才初始化示例
- *  - 目录树：笔记/文件夹图标区分、支持移动到任意文件夹（对话框 + 拖拽）、右键菜单
- *  - 导出：文件名安全化、重名处理、沙箱禁用下载时降级为「可复制」弹窗、支持文件夹导出 zip
- *  - 体验：状态栏（存储后端/字数/视图切换）、空状态、Toast、快捷键、明暗主题跟随 DBX
+ * Refurbishment:
+ *  - Loss of notes: multiple backend of storage + Writing failed visible;only「There is no data.」Only then start with an example
+ *  - Directory tree: Notes/Folder icon differentiates and supports moving to any folder (dialog) + Drag, Right Key Menu
+ *  - Export: Secure file name, duplicate-name handling, downgraded to「Replicable」Dialog, support folder export zip
+ *  - Experience: Statusbar (store backend)/Number of words/View Switch, Empty Status,Toast、Shortcut, Dark Theme Follow DBX
  */
 (function () {
   "use strict";
@@ -15,14 +15,14 @@
   function $(id) { return document.getElementById(id); }
 
   /**
-   * 安全绑定：元素不存在时记一条诊断日志并跳过，绝不抛错中断启动。
-   * 历史事故：index.html 里 `btn-copy-sql` 被注释掉，而 bindEvents 里仍写
+   * Secure binding: The element is kept in a diagnostic log when it does not exist and skips, and no error is thrown to interrupt the start.
+   * Historical accidents:index.html Lee. `btn-copy-sql` It's been said off, and... bindEvents It still says
    *   `$("btn-copy-sql").onclick = copySqlToDbx;`
    * → TypeError: Cannot set properties of null
-   * → bindEvents 在这里中断（后面 40 多个绑定全部没执行）
-   * → boot() 第一行就抛错 → applyTheme/renderStatus/S.init 从未执行
-   * → 表现为「所有按钮点不动 + 存储状态一直停在 unknown + 笔记永远不落盘」。
-   * 现在改成：缺元素只记日志，不再连坐后面所有绑定。
+   * → bindEvents Break here. 40 Multiple bindings not executed)
+   * → boot() First line is wrong. → applyTheme/renderStatus/S.init Never implemented
+   * → As in「All buttons hold still. + Storage status stopped. unknown + The notes will never leave behind.」。
+   * Now, the missing elements will only be recorded in the log and will no longer be tied to the back.
    */
   function on(id, evName, handler, optional) {
     var el = $(id);
@@ -38,7 +38,7 @@
   }
   function click(id, handler, optional) { return on(id, "onclick", handler, optional); }
 
-  /** 页面级错误捕获：任何未捕获异常都进置顶诊断条，不再静默失败 */
+  /** Page-level error capture: Any uncaught exception enters the top diagnostic bar and fails silently */
   window.addEventListener("error", function (e) {
     var where = (e && e.filename)
       ? " @ " + String(e.filename).split(/[\\/]/).pop() + ":" + (e.lineno || 0) + ":" + (e.colno || 0)
@@ -57,23 +57,23 @@
     view: "split",
     query: "",
     loaded: false,
-    // 本会话内【用户显式删掉】的节点 id（删文件夹时含其全部子节点）。
-    // 只累积、不清理：多带一次已删的 id 是无害的，而漏带就会让删除不生效。
-    // 后端只认这个列表，绝不把「快照里没有」当成删除 —— 否则另一端（同目录的另一个
-    // 连接）保存旧快照时就会把这边新建的笔记删掉。
+    // Node in this session [User 's visible deleted] id（Can not delete folder: %s: No such folder
+    // Accumulated, not cleaned: one more time deleted id It is harmless, and the omission would make the deletion ineffective.
+    // This is the list for the backend. Never.「Not in the snapshot.」Consider delete -- otherwise the other end (the other one in the same directory)
+    // When you save old snapshots, you delete the new notes here.
     deletedIds: [],
-    // 正文没读上来的笔记 id：这类笔记【不许】把正文写回（会把磁盘上的正文清空）。
-    // 由 notes/load 的 contentMissing 标记填充。
+    // It's not in the text. id：Such notes [can't] write back the body (will empty the disk).
+    // By notes/load contentMissing Mark fill.
     contentMissing: {}
   };
   var manualTheme = null;
-  var configuredDir = "";   // 连接表单里填的「笔记存储目录」（宿主传入，前端只能读不能写）
-  var dragId = null; // 保留兼容，指针拖拽使用 pdrag
-  var pdrag = null; // 指针拖拽状态：{id, n, row, startX, startY, moved, ghost}
+  var configuredDir = "";   // From the connection form.「Note Storage Directory」（Host in, read and write only at the frontend)
+  var dragId = null; // Keep compatible, pointer drag pdrag
+  var pdrag = null; // Pointer drag state:{id, n, row, startX, startY, moved, ghost}
   var previewTimer = null;
   var toastTimer = null;
 
-  // ---------------- 基础工具 ----------------
+  // ---------------- Basic tools ----------------
   function uid() {
     return "n" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   }
@@ -130,17 +130,17 @@
   function selectedNode() {
     return state.activeId ? byId(state.activeId) : null;
   }
-  /** 新建笔记时默认落到哪个文件夹：当前选中文件夹 → 当前笔记所在文件夹 → 根目录 */
+  /** Default folder to which to drop when new notes are created: Current selected file Catalog → Synchronising folder → Root Directory */
   function targetFolderId() {
     var n = selectedNode();
     if (!n) { return null; }
     return n.type === "folder" ? n.id : (n.parentId || null);
   }
 
-  // ---------------- 持久化 ----------------
+  // ---------------- Enduring ----------------
   function snapshot() {
-    // 正文没读上来的笔记【省略 content 字段】：后端见到"没带正文"就原样保留磁盘内容。
-    // 若这里发一个空串，后端会把它当作"用户把正文清空了"写盘 —— 笔记就真的没了。
+    // Note not read in text. content Fields): Seed at Backend"No text."Keeps the disk content as it is.
+    // If there's an empty string here, the backend will take it."The user cleared the text."Writing discs -- notes are really gone.
     var nodes = state.nodes.map(function (n) {
       if (n.type !== "note" || !state.contentMissing[n.id]) { return n; }
       var copy = {};
@@ -162,7 +162,7 @@
     S.save(snapshot(), debounce !== false);
   }
 
-  /** 记录哪些笔记的正文没读上来（后端 contentMissing 标记），并给出可见提示 */
+  /** The text of which notes were not read. contentMissing Mark) and give visible hints */
   function indexContentMissing(nodes) {
     state.contentMissing = {};
     var n = 0;
@@ -170,19 +170,19 @@
       if (x && x.type === "note" && x.contentMissing) { state.contentMissing[x.id] = true; n++; }
     });
     if (n) {
-      toast(n + " notes have unreadable content files. Editing is locked to prevent overwriting them. Check the storage directory.", "warn");
+      toast(n + " notes have not availableable content files. Editing is locked to prevent overwriting them. Check the storage directory.", "warn");
       S.log("Notes with missing content found during load", false, n + " locked");
     }
     return n;
   }
 
   /**
-   * 把「载入结果」套用到 state，成功返回 true。
+   * Put「Load Results」Apply to state，Returns successfully true。
    *
-   * 坑：S.init() / S.reload() resolve 的是 {data:{nodes,...}, firstRun, ...}，
-   * 笔记数据在 .data 这一层，不在顶层。取错层会静默失败（守卫条件不成立），
-   * 于是「换存储目录」或「恢复备份」后界面仍显示旧状态，而紧接着的那次
-   * persist 又把旧状态写回磁盘 —— 等于把刚写好的结果原地抹掉。
+   * Pipe:S.init() / S.reload() resolve {data:{nodes,...}, firstRun, ...}，
+   * Note data in .data This floor, not at the top. The wrong layer will fail silently (no security conditions are in place).
+   * And...「Change Storage Directory」or「Restore Backup」The back interface still shows the old state, the next one.
+   * persist And write back the old state on disk -- it's the same way to erase the just finished results.
    */
   function applyLoaded(res) {
     var d = (res && res.data) ? res.data : res;
@@ -191,7 +191,7 @@
     state.activeId = d.activeId || null;
     state.expanded = d.expanded || {};
     if (d.view) { setView(d.view); }
-    // 重新载入 = 世界被整体替换：此前累积的删除记录作废，缺正文标记按新数据重建。
+    // Reload = The world was replaced as a whole: the previously accumulated deletion records were invalidated and the missing text mark was reconstructed with new data.
     state.deletedIds = [];
     indexContentMissing(d.nodes);
     if (state.activeId && !byId(state.activeId)) { state.activeId = null; }
@@ -202,7 +202,7 @@
     return true;
   }
 
-  // ---------------- 图标 ----------------
+  // ---------------- Icon ----------------
   var ICONS = {
     folder: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">' +
       '<path d="M2 4.3c0-.6.5-1.1 1.1-1.1h2.5l1.3 1.6h6c.6 0 1.1.5 1.1 1.1v5.8c0 .6-.5 1.1-1.1 1.1H3.1c-.6 0-1.1-.5-1.1-1.1z" ' +
@@ -220,7 +220,7 @@
     return s;
   }
 
-  // ---------------- 主题 ----------------
+  // ---------------- Theme ----------------
   function hostTheme() {
     try {
       var d = window.dbxPlugin;
@@ -250,7 +250,7 @@
     toastTimer = setTimeout(function () { t.hidden = true; }, 2600);
   }
 
-  // ---------------- 通用弹窗 ----------------
+  // ---------------- General Blast Window ----------------
   function closeModal() {
     var m = $("modal");
     m.hidden = true;
@@ -360,7 +360,7 @@
     return out;
   }
 
-  // ---------------- 目录树渲染 ----------------
+  // ---------------- Directory Tree Rendering ----------------
   function highlightInto(el, text, q) {
     el.textContent = "";
     var s = String(text || "");
@@ -381,10 +381,10 @@
     row.className = "node" + (n.id === state.activeId ? " active" : "");
     row.setAttribute("data-id", n.id);
     row.setAttribute("data-type", n.type);
-    // 这里【绝对不能】写 draggable="true"：
-    // 目录树的拖拽是上面用指针事件自实现的；一旦元素可原生拖拽，浏览器会在拖到几像素时
-    // 抢走手势 → 触发原生 HTML5 拖拽 → 随即发 pointercancel 掐断我们的 pointermove，
-    // 结果就是「拖不动 + 一路禁止光标」。2026-09-21 的实际事故正是这一行遗留属性。
+    // Here. draggable="true"：
+    // The drag in the tree of the directory is self-fulfilled with a pointer event above; once the elements can be dragged, the browser drags to a few pixels.
+    // Take the gesture. → Trigger original HTML5 Drag → I'll be right there. pointercancel Cut us off. pointermove，
+    // It turns out...「I can't. + Ban cursor all the way.」。2026-09-21 The actual accident is the legacy of this line.
     row.style.paddingLeft = (8 + depth * 14) + "px";
 
     var tw = document.createElement("span");
@@ -420,10 +420,10 @@
     row.ondblclick = function () { renameNode(n); };
     row.oncontextmenu = function (e) { e.preventDefault(); select(n.id); showCtxMenu(e.clientX, e.clientY, n); };
 
-    // 指针拖拽（不依赖 HTML5 DnD API，在沙箱/插件 webview 中更可靠）
+    // Pointer Drag (not dependent) HTML5 DnD API，In the sandbox./Plugin webview More reliable)
     row.addEventListener("pointerdown", function (e) {
       if (e.button !== undefined && e.button !== 0) { return; }
-      // 展开箭头/按钮上不启动拖拽，保证点击展开、重命名等交互正常
+      // Expand Arrow/Do not start drag on the button, make sure that clicks expand, rename, etc. are interactive
       if (e.target && e.target.closest && (e.target.closest(".twisty") || e.target.closest("button"))) { return; }
       pdragBegin(e, n, row);
     });
@@ -440,7 +440,7 @@
     row.classList.add("drop-target");
   }
 
-  // ---------------- 指针拖拽（替代 HTML5 DnD，避免沙箱内 dragover 不生效/无放置光标） ----------------
+  // ---------------- Pointer Drag (Replacement) HTML5 DnD，Avoid the sandbox. dragover Not effective/No placement cursor) ----------------
 
   function pdragBegin(e, n, row) {
     pdrag = { id: n.id, n: n, row: row, startX: e.clientX, startY: e.clientY, moved: false, ghost: null };
@@ -463,14 +463,14 @@
     return null;
   }
 
-  // 返回落点：文件夹 id=移入；笔记 id=成为同级（取其父级）；null=根目录；undefined=取消（无效/自身/子文件夹）
+  // Synchronising folder id=moving;notes id=(a) Be of the same rank (at the parent level);null=Root directories;undefined=Cancel/Self/Subfolders)
   function computeDropTarget(x, y, srcId) {
     var nodeEl = elementToNode(x, y);
     if (!nodeEl) {
       var tree = $("tree");
       var under = document.elementFromPoint(x, y);
-      if (tree && under && tree.contains(under)) { return null; } // 树空白区 = 根目录
-      return undefined; // 落在插件区域外，视为取消
+      if (tree && under && tree.contains(under)) { return null; } // Tree Space = Root Directory
+      return undefined; // Fall outside the plugin area and consider cancellation
     }
     var id = nodeEl.getAttribute("data-id");
     if (id === srcId) { return undefined; }
@@ -497,7 +497,7 @@
     if (!pdrag) { return; }
     if (!pdrag.moved) {
       var dx = e.clientX - pdrag.startX, dy = e.clientY - pdrag.startY;
-      if (dx * dx + dy * dy < 36) { return; } // 阈值 ~6px，区分点击与拖拽
+      if (dx * dx + dy * dy < 36) { return; } // threshold ~6px，Distinguishing Click and Drag
       pdrag.moved = true;
       document.body.classList.add("dragging-active");
       if (pdrag.row) { pdrag.row.classList.add("dragging"); }
@@ -525,14 +525,14 @@
     }
   }
 
-  // 全局指针监听（仅在拖拽进行中生效，否则直接 return，不影响其它交互）
+  // Global pointer listening (valid only during drag, otherwise direct) return，without prejudice to other interactions)
   document.addEventListener("pointermove", pdragMove);
   document.addEventListener("pointerup", pdragEnd);
   document.addEventListener("pointercancel", pdragEnd);
 
-  // 兜底闸门：任何情况下都不允许原生 HTML5 拖拽接管目录树。
-  // 原生拖拽一旦启动会立刻发 pointercancel 掐断指针拖拽，并显示禁止光标 —— 加这一层
-  // 是为了让「日后有人再加回 draggable / 或从别处拖入元素」也不会把拖拽功能搞死。
+  // Bottom gate: Not allowed under any circumstances Original Fan. HTML5 Drag to take over the directory tree.
+  // The original drag will start right away. pointercancel Cut the pointer drag and show the forbidden cursor - add this layer
+  // It's to make...「We'll get it back later. draggable / or drag elements from elsewhere」It's not gonna kill the drag.
   document.addEventListener("dragstart", function (e) {
     var t = e.target;
     if (t && t.closest && t.closest("#tree")) { e.preventDefault(); }
@@ -553,7 +553,7 @@
           hit[n.id] = true;
         }
       });
-      // 命中的父链也要显示
+      // You'll have to show your father's life.
       Object.keys(hit).forEach(function (id) {
         var p = byId(id), guard = 0;
         if (p) { p = p.parentId ? byId(p.parentId) : null; }
@@ -598,7 +598,7 @@
     $("sel-actions").hidden = !sel;
   }
 
-  // ---------------- 编辑器 / 预览 ----------------
+  // ---------------- Editor / Preview ----------------
   function renderEditor() {
     var n = activeNote();
     var panes = $("panes");
@@ -617,8 +617,8 @@
     panes.setAttribute("data-empty", "0");
     title.disabled = false;
     editor.disabled = false;
-    // 正文没读上来的笔记：冻结编辑。这种笔记绝不会把正文写回磁盘（见 snapshot），
-    // 若还允许输入，用户敲的内容会静默丢失；冻结 + 说明才是诚实的做法。
+    // The notes that are not read in the text: Freezing the editor. Such notes would never return the text to the disk. snapshot），
+    // If the input is also allowed, the user knocks silently loses the content; freezes + It's about honesty.
     var frozen = !!state.contentMissing[n.id];
     editor.readOnly = frozen;
     editor.placeholder = frozen
@@ -675,7 +675,7 @@
     persist(true);
   }
 
-  // ---------------- 存储状态 ----------------
+  // ---------------- Storage status ----------------
   var STATUS_TEXT = {
     host: "Saved to DBX plugin storage",
     folder: "Saved to a local folder",
@@ -685,7 +685,7 @@
     sidecar: "Saved to the storage directory"
   };
   function renderStatus(st) {
-    st = S.status();   // 必须现取副本：onStatus 回调传的是内部 status 对象（没有 .diag 等派生字段）
+    st = S.status();   // Copies must be obtained:onStatus It's internal. status Object (no) .diag Waiting field)
     var pill = $("store-status");
     var dot = pill ? pill.querySelector(".store-dot") : null;
     var text = $("store-text");
@@ -706,7 +706,7 @@
       label = "Storage directory not configured: notes are temporarily stored in " + where;
     }
     text.textContent = label;
-    // 异常时仅用状态条颜色 + title 提示，不再弹干扰性横幅
+    // Only state bar colours for anomalies + title No more jamming banners.
     pill.title = unconfigured
       ? "Notes storage directory not configured: notes are currently saved in " + (st.storageDir || st.storagePath || "the plugin's default directory") +
         ". Set the notes storage directory in connection settings and reconnect to save them in your chosen folder."
@@ -714,18 +714,18 @@
              : "Saved persistently" + (st.storageDir ? " (" + st.storageDir + ")" : ""));
   }
 
-  /* ============ 页面置顶诊断条（上线默认关闭，保留代码便于排障） ============
-   * 2026-09-21：存储已稳定，按产品要求把置顶条下线（线上太占地方）。
-   * 需要排障时：把 SHOW_DIAG_BAR 改成 true + 取消 index.html 里那段注释即可，
-   * renderDiag() 的调用点全部保留着，无需再改其它地方。
+  /* ============ Page Top Diagnosis Bar (upline default close, code retention easy to disable) ============
+   * 2026-09-21：Storage has stabilized and toplines (overlines too much space) are placed as required by the product.
+   * When you need a barrier: SHOW_DIAG_BAR Replace with true + Cancel index.html The comment in the comments reads:
+   * renderDiag() The call points are all kept and need not be changed elsewhere.
    */
   var SHOW_DIAG_BAR = false;
-  var SHOW_DIAG_LOG_IN_MODAL = false;   // 存储状态弹窗里的「存储诊断日志」面板，默认隐藏
+  var SHOW_DIAG_LOG_IN_MODAL = false;   // It's in the window.「Storage diagnostic log」Panel, Default Hide
 
-  /* ============ 功能开关：导入 .md（暂时下线） ============
-   * 2026-09-21：导入功能容易出问题，先摘掉入口（工具栏按钮 / 右键菜单 / 隐藏 file input 全下线），
-   * 代码与处理逻辑全部保留。要恢复：把下面改成 true，并把 index.html 里 #btn-import-md 与
-   * #file-input 两处注释取消即可 —— 打包闸门会校验「开关与 HTML 必须一致」，不一致直接拒绝打包。
+  /* ============ Function Switch: Import .md（Out of line for now) ============
+   * 2026-09-21：Import function is easily problematic and the entry is removed (toolbar button) / Right Key Menu / Hide file input I'm sorry.
+   * The code and processing logic are preserved. To recover: replace the bottom with the following: true，And put index.html Lee. #btn-import-md with
+   * #file-input Just cancel two notes - Pack the gate. Check「Switches and HTML It has to be consistent.」，Inconsistent direct refusal to pack.
    */
   var ENABLE_IMPORT = false;
 
@@ -762,10 +762,10 @@
   }
 
   function renderDiag() {
-    if (!SHOW_DIAG_BAR) { return; }   // 置顶诊断条已下线
+    if (!SHOW_DIAG_BAR) { return; }   // The top diagnostic bar is offline.
     var bar = $("diag-bar");
     if (!bar) { return; }
-    var st = S.status();   // 同上：必须现取副本，否则 st.diag 为空 → 日志区永远显示"（暂无日志）"
+    var st = S.status();   // Idem: Copies must be taken now, otherwise st.diag empty → Log area always shows"（I don't have a log yet."
     var sev = diagSeverity(st);
     bar.hidden = false;
     bar.setAttribute("data-sev", sev);
@@ -793,7 +793,7 @@
       log.textContent = (st.diag && st.diag.length) ? st.diag.join("\n") : "(No logs yet)";
       log.scrollTop = log.scrollHeight;
     }
-    // 默认展开；一旦出现严重问题（bad）强制再展开一次，保证故障不会被折叠藏起来
+    // Default roll-out; in case of serious problems (bad）Make sure it doesn't fold up.
     if (sev === "bad" && diagLastSev !== "bad") { diagOpen = true; }
     diagLastSev = sev;
     if (log) { log.hidden = !diagOpen; }
@@ -825,12 +825,12 @@
       p.textContent = lines.join("\n");
       card.appendChild(p);
 
-      // 诊断日志面板：上线默认隐藏（SHOW_DIAG_LOG_IN_MODAL=false），
-      // 改成 true 即可放出来；日志本身始终保留在 S.status().diag / S.report() 里。
+      // Diagnosis log panel: Upline default hidden (SHOW_DIAG_LOG_IN_MODAL=false），
+      // Replace with true ; the log itself remains in S.status().diag / S.report() Lee.
       if (SHOW_DIAG_LOG_IN_MODAL) {
         var det = document.createElement("details");
         det.className = "m-diag";
-        det.open = !st.persistent;   // 有问题默认展开
+        det.open = !st.persistent;   // Problem Default Expand
         var sum = document.createElement("summary");
         sum.textContent = "Storage diagnostic logs (" + ((st.diag && st.diag.length) || 0) + " entries)";
         det.appendChild(sum);
@@ -853,9 +853,9 @@
     });
   }
 
-  // ---------------- 侧栏底部：统计 ----------------
-  // 这里不再显示存储位置：存储状态弹窗（点状态栏）是唯一权威出口，
-  // 同一信息两处显示只会出现「两处不一致、用户不知道该信哪个」。
+  // ---------------- Bottom sidebar: Statistics ----------------
+  // The storage position is no longer shown here: the storage-state window (point-state bar) is the only authoritative exit.
+  // The same message shows that it only happens.「Two inconsistencies. Users don't know which letter.」。
   function renderSideFoot() {
     var foot = $("side-foot");
     if (!foot) { return; }
@@ -872,8 +872,8 @@
       '<span class="foot-num">' + totalFolders + '</span> folders';
     foot.appendChild(stat);
 
-    // 未配置 storage_dir 时给出醒目提示：笔记其实写进了插件默认目录，用户看不到 → 误以为没存储。
-    // 注意这里只说「去哪看」，不重复贴路径（状态弹窗里有）。
+    // Not configured storage_dir : The notes are actually written into the plugin default directory, which the user does not see → It's not stored.
+    // Here's what I'm saying.「Where to?」，Do not repeat the path (in the status window).
     if (st.backend === "sidecar" && st.dirConfigured === false) {
       var warn = document.createElement("div");
       warn.className = "foot-warn";
@@ -883,7 +883,7 @@
     }
   }
 
-  /** 授权一个本地目录，把笔记真正落盘 */
+  /** Authorize a local directory to actually drop the notes. */
   function chooseDirFlow() {
     S.pickDirectory().then(function (r) {
       if (!r.ok) {
@@ -904,17 +904,17 @@
     });
   }
 
-  // ---------------- 渲染入口 ----------------
+  // ---------------- Rendering entrance ----------------
   function render() {
     renderTree();
     renderEditor();
     renderStatus();
     renderSideFoot();
     renderDiag();
-    renderAITarget();   // AI 栏顶部要显示「当前处理哪篇 / 选中多少字」，换笔记就得跟着变
+    renderAITarget();   // AI Show at the top of the column「Which one is currently being processed? / Select how many words」，Change your notes.
   }
 
-  // ---------------- 节点操作 ----------------
+  // ---------------- Node Operations ----------------
   function select(id) {
     state.activeId = id;
     var n = byId(id);
@@ -1006,7 +1006,7 @@
     toast("Moved to “" + (destId ? byId(destId).name : "Root") + "”");
   }
 
-  // ---------------- 右键菜单 ----------------
+  // ---------------- Right Key Menu ----------------
   function closeCtxMenu() {
     var m = $("ctx-menu");
     m.hidden = true;
@@ -1071,15 +1071,15 @@
     });
   }
 
-  // ---------------- 导入 / 导出 / 备份 / 恢复 ----------------
+  // ---------------- Import / Export / Backup / Restore ----------------
   //
-  // 落盘有两条通道，优先级从高到低：
-  //   1. 宿主原生「另存为」（dbxPlugin.saveFile）—— 由宿主弹系统保存对话框，用户自己选目录和文件名。
-  //      沙箱 iframe 里没有磁盘权限，a.download / blob 导航会被宿主静默取消，所以只能借宿主之手。
-  //   2. 侧车写进「笔记存储目录」（toDisk=true）—— 宿主没有 saveFile 能力时的兜底，路径回显给用户。
+  // There are two channels for landing, with priority levels ranging from high to low:
+  //   1. Homeowner.「Save As」（dbxPlugin.saveFile）—— The dialogue box is saved by the host bomb system and the user selects its own directory and filename.
+  //      Sandbox iframe There are no disk privileges.a.download / blob The navigation will be cancelled silently by the host, so it will only be possible to borrow the host's hand.
+  //   2. The sidecar.「Note Storage Directory」（toDisk=true）—— No host. saveFile The bottom of the power, the path is shown to the user.
   //
-  // 备份必须包含配置：mdnotes-backup.json（版本/时间/原存储目录/计数）+ .mdnotes/meta.json（目录树索引）
-  // + 全部正文 .md。只备份正文而不备份索引，恢复出来就是一堆没有名字和层级的孤儿文件。
+  // Backup must contain configuration:mdnotes-backup.json（Version/Time/Original Storage Directory/Counted)+ .mdnotes/meta.json（Directory Tree Index)
+  // + All Body .md。Backup is a collection of orphan files without a name and level, but not an index.
 
   function merge(o, extra) {
     var out = {}, k;
@@ -1103,7 +1103,7 @@
     return (n / 1024 / 1024).toFixed(2) + " MB";
   }
 
-  /** 让侧车产出字节，再交给用户：优先宿主「另存为」（自选目录），否则回退写进存储目录 */
+  /** Let the sidecar produce bytes and hand them over to the user: preferred host「Save As」（Custom directory), or return to storage directory */
   function saveViaSidecar(method, params, what, linesFn) {
     if (!S.hasHostSave()) {
       return S.invoke(method, merge(params, { toDisk: true })).then(function (d) {
@@ -1139,7 +1139,7 @@
     return saveViaSidecar("notes/backup", {}, "Full notes backup", backupLines);
   }
 
-  /** 备份成功后把「包里装了什么」摊开说 —— 「含配置」必须看得见，否则没人知道它能用来恢复。 */
+  /** After the backup is completed「What's in the bag?」Let's go. 「configuration」It must be visible, or no one knows it can be restored. */
   function backupLines(r) {
     var lines = [
       "Contents: " + (r.count || 0) + " notes · " + (r.folders || 0) + " folders",
@@ -1153,7 +1153,7 @@
     return lines;
   }
 
-  /** 已保存到用户所选目录的弹窗 */
+  /** Dialog saved to user selected directory */
   function showSavedModal(title, path, extraLines, actions) {
     openModal(function (card) {
       var h = document.createElement("h3"); h.textContent = title; card.appendChild(h);
@@ -1200,12 +1200,12 @@
   }
 
   /**
-   * 多行内容确认框（恢复这种破坏性操作要先逐条列清楚）。
+   * Multi-line content confirmation box (renewal of this destructive operation should be clear by article).
    *
-   * 注意：这里**不能**也叫 confirmModal —— 同名函数声明会被后声明的覆盖，
-   * 而上面那个 confirmModal(title, message, ...) 收的是字符串。
-   * 一旦重名，先声明的那个被顶掉，removeNode 传字符串进来就会
-   * `lines.join is not a function` 抛错 → 「删除」按钮点了毫无反应（弹窗都出不来）。
+   * Attention: Here.**I can't.**Yeah. confirmModal —— The same name statement will be overridden by the later declaration.
+   * And the one up there. confirmModal(title, message, ...) Collects a string.
+   * Once it's renamed, the first one to be declared is replaced.removeNode If you send a string in, you will.
+   * `lines.join is not a function` Wrong. → 「Delete」The button did not react.
    */
   function confirmListModal(title, lines, okText) {
     return new Promise(function (resolve) {
@@ -1224,7 +1224,7 @@
     });
   }
 
-  // ---------------- 从备份恢复 ----------------
+  // ---------------- Restore from Backup ----------------
 
   function restoreFlow() {
     var inp = $("backup-input");
@@ -1236,8 +1236,8 @@
   function handleRestoreFile(files) {
     var f = files && files[0];
     if (!f) { return; }
-    // 宿主对 request 参数有 2 MiB 上限，base64 之后能带上行的 zip 约 1.5 MB。
-    // 超过就明确拒绝并给替代方案，而不是让它失败在一个看不懂的报错上。
+    // The host. request Parameters have 2 MiB ceiling,base64 I'll take care of it later. zip About 1.5 MB。
+    // More than explicitly rejecting and giving alternative solutions, rather than letting them fail on an incomprehensible blunder.
     if (f.size > S.MAX_UPSTREAM_BYTES) {
       toast("Backup is too large (" + fmtBytes(f.size) + " > limit " + fmtBytes(S.MAX_UPSTREAM_BYTES)
         + "). Extract it manually and place the .md files in the storage directory.", "warn");
@@ -1263,7 +1263,7 @@
       return confirmListModal("Restore this backup?", lines, "Restore now");
     }).then(function (ok) {
       if (!ok) { toast("Restore canceled"); return null; }
-      // 恢复前先把挂起的防抖写落定，避免「恢复完成」之后又被那一帧旧快照覆盖。
+      // Put the hang-up-proof writing down before it recovers.「Restore complete」It was then covered by that old photo.
       return S.flush().then(function () {
         return S.invoke("notes/restore", { dataBase64: b64 });
       }).then(function (r) {
@@ -1285,8 +1285,8 @@
       toast("Restore failed: " + (e && e.message ? e.message : e), "warn");
     });
   }
-  /** 打开「导入 .md」的文件选择框。导入功能下线时不会走到这里；
-   *  取元素用安全写法（先赋值再判空），避免元素缺失时抛错把调用方连坐。 */
+  /** Open「Import .md」. The file selection box. This is not the way to import downlines;
+   *  Takes the element in a secure writing (prior value and emptiness) to avoid the error of the caller when the element is missing. */
   function pickImportFiles() {
     var fi = $("file-input");
     if (fi) { fi.click(); } else { toast("Import is disabled", "warn"); }
@@ -1330,7 +1330,7 @@
     }
   }
 
-  // ---------------- 与数据库表联动 ----------------
+  // ---------------- Connect to database table ----------------
   function parseFields(text) {
     return String(text || "").split(/\r?\n/).map(function (l) { return l.trim(); })
       .filter(Boolean).map(function (l) {
@@ -1402,12 +1402,12 @@
     toast("Created note for “" + table + "”");
   }
 
-  /** 从宿主传入的上下文自动建笔记（右键「为此表新建笔记」） */
+  /** Automatically build notes from host context (right key)「New Notes for this Table」） */
   /**
-   * 处理「为此表新建笔记」上下文。
-   * 上下文有两个来源：
-   *  1) 宿主直接把 context 挂在桥接对象上（dbxPlugin.context）
-   *  2) 右键菜单由侧车记录到 pending，前端 notes/load 取回（不依赖宿主的打开方法名）
+   * Process「New Notes for this Table」Context.
+   * The context has two sources:
+   *  1) The host will take it directly. context Hang on to bridge object (dbxPlugin.context）
+   *  2) Right-click menu recorded from sidecar pending，Frontend notes/load Recovery (name of open method not dependent on host)
    */
   function handleHostContext(pending) {
     var ctx = pending || null;
@@ -1424,7 +1424,7 @@
     }).filter(Boolean).join("\n");
 
     var title = "Table design: " + table;
-    var exist = state.nodes.filter(function (n) { return n.type === "note" && (n.name === title || n.name === ("表设计：" + table)); })[0];
+    var exist = state.nodes.filter(function (n) { return n.type === "note" && (n.name === title || n.name === ("Table design:" + table)); })[0];
     if (exist) {
       state.activeId = exist.id;
       persist(false);
@@ -1441,7 +1441,7 @@
     if (!n) { toast("Select a note first", "warn"); return; }
     var ta = $("editor");
     var table = "";
-    var m = String(n.name || "").match(/(?:Table design|表设计)[：:]\s*(.+)$/i);
+    var m = String(n.name || "").match(/(?:Table design|Table design)[：:]\s*(.+)$/i);
     if (m) { table = m[1].trim(); }
     var block = "\n```sql\nSELECT *\nFROM " + (table || "your_table") + "\nLIMIT 100;\n```\n";
     var start = ta.selectionStart == null ? ta.value.length : ta.selectionStart;
@@ -1472,7 +1472,7 @@
     copyText(sql, "SQL (ready to paste into DBX SQL editor)");
   }
 
-  // ---------------- 初始化示例（仅在完全没有数据时） ----------------
+  // ---------------- Example of initialization (only when data are completely unavailable) ----------------
   function seed() {
     var welcome =
       "# Welcome to AI.MD Notes\n\n" +
@@ -1504,19 +1504,19 @@
     state.activeId = n1.id;
   }
 
-  // ---------------- AI 助手（右侧常驻栏） ----------------
+  // ---------------- AI Assistant (right-hand resident) ----------------
   //
-  // 模型调用全部发生在侧车（前端在沙箱里既没有网络，也拿不到密钥）。
-  // 这里只负责：取目标文本 → 展示结果（带会话记录）→ 让用户**显式**选择
-  // 「插入到光标 / 替换选中 / 追加到末尾 / 复制」。
-  // 任何会覆盖已有正文的操作（替换选中、在有选区时插入）都必须先过确认框 ——
-  // 与全插件的「不静默覆盖」原则一致。
+  // The model is all used in the sidecar (with neither a network nor a key in the sandbox at the frontend).
+  // It's only for: get the target text. → Presentation of results (with session records)→ Let Users**Visible**Selection
+  // 「Insert at cursor / Replace selection / Append to end / Copy」。
+  // Any operation that will overwrite an existing body (replacement selection, insert when there is a constituency) must go past the confirmation box -
+  // With Full Plugin「Unquietly Overwrite」The principle is consistent.
   //
-  // 为什么不做成弹窗：弹窗会遮住笔记、关掉就丢历史，而 AI 结果常常要边看边改。
+  // Why don't you make a dialog: the dialog covers the notes, closes them and loses history. AI The result is often seen to change.
   //
-  // noContext = 没有笔记正文时**仍然可用**：
-  //   「提问」退化成纯对话，「续写」退化成按你的要求自由生成（两者都要求你写下问题/要求）；
-  //   「分析」「润色」的语义就是处理一份现成文本，没有正文做不了 —— 所以它们没这个标记。
+  // noContext = When there are no notes,**Still available**：
+  //   「Ask」It's a simple conversation.「Continue writing」It's degenerated to be created as you want./Requests);
+  //   「Analyze」「Polish」The semantic is to process an off-the-shelf text without text -- so they don't have this tag.
   var AI_TASKS = [
     { id: "analyze", label: "Analyze", hint: "Summarize key points, to-dos, and inconsistencies", needsInput: false, go: "Start analysis", noContext: false },
     { id: "polish", label: "Polish", hint: "Improve clarity while preserving meaning and Markdown structure", needsInput: true, go: "Start polish", noContext: false },
@@ -1524,15 +1524,15 @@
     { id: "ask", label: "Ask", hint: "Ask questions about the note; pure chat when no note content", needsInput: true, go: "Ask", noContext: true }
   ];
 
-  // 两个模式（默认聊天）：
-  //   聊天 —— 纯对话：只发你写的话，不带任何笔记内容；不涉及"分析对象"，也没有写回操作。
-  //   创作 —— 处理笔记：出现「分析对象」与任务标签，结果带四个写回操作。
+  // Two modes (default chat):
+  //   Chat - pure conversation: send only what you write, without any notes; does not involve"Analysis target"，There is no return operation.
+  //   Create - Process Notes: Present「Analysis target」with the task label, the result is four write back operations.
   var AI_VIEWS = [
     { id: "chat", label: "Chat", hint: "Conversation only: sends your message without note content" },
     { id: "create", label: "Compose", hint: "Work with notes: analyze content and write results back to notes" }
   ];
 
-  // 缺配置时给中文名，用户才知道要去填哪一项
+  // The user knows which one to fill when the configuration is missing.
   var AI_MISSING_LABEL = {
     enabled: "Enable AI features",
     baseUrl: "API URL",
@@ -1540,17 +1540,17 @@
     apiKey: "API key"
   };
 
-  var AI_MAX_ENTRIES = 20;   // 只留最近若干条，避免长时间使用后内存无限增长
+  var AI_MAX_ENTRIES = 20;   // Only the most recent ones are left to avoid unlimited growth of memory after long use
 
   var aiState = {
     open: false,
-    view: "chat",        // chat（默认，纯对话）| create（创作：带分析对象与写回）
-    task: "analyze",     // 仅创作模式使用
+    view: "chat",        // chat（Default, pure conversation)| create（Create: with analyzers and write back)
+    task: "analyze",     // Use only creative mode
     cfg: null,
     busy: false,
     entries: [],
-    cfgPristine: true,   // 配置弹框还没被用户改过（没改过就允许用服务端值覆盖表单）
-    targetMode: "auto",  // 分析对象来源：auto | selection | note | none
+    cfgPristine: true,   // The configuration frame has not been modified by the user (the service end is allowed to overwrite the form without changing it)
+    targetMode: "auto",  // Sources of analysis:auto | selection | note | none
     layoutReady: false
   };
 
@@ -1571,17 +1571,17 @@
     return (e && e.message) ? e.message : String(e || "Unknown error");
   }
 
-  /* ---------------- 分析对象（显式可控 + 实时刷新） ----------------
+  /* ---------------- Analytic Object (Fartable Controllable) + Update in Real Time) ----------------
    *
-   * 之前的做法是"打开面板时算一次范围"，两个问题：
-   *   1) 面板一开就把范围钉住了 —— 之后在编辑器里改选、改内容，栏里显示的还是旧的，
-   *      看起来就是"对象改不了了"；
-   *   2) 没有任何方式显式指定或清除对象。
-   * 现在把对象做成显式状态，并且跟着编辑器实时刷新：
-   *   auto      —— 跟随编辑器：有选中用选中，否则整篇（默认）
-   *   selection —— 固定用选中内容（要求当前真的有选中）
-   *   note      —— 固定用整篇笔记
-   *   none      —— 已清除：不发送任何正文，生成按钮禁用
+   * That was the way it was."Calculate range once you open the panel"，Two questions:
+   *   1) As soon as the panel was opened, the range was pinned -- and then the selection, the content in the editor, the column was still old.
+   *      Looks like it."We can't change the subject."；
+   *   2) There is no way to clearly specify or clear objects.
+   * The object is now made visible and updated in real time with the editor:
+   *   auto      —— Following editor: selected, otherwise whole (default)
+   *   selection —— Fixed Selection (requires that the current selection is genuine)
+   *   note      —— Fixed whole note
+   *   none      —— Cleared: No text sent, generation button disabled
    */
   var AI_TARGET_MODES = [
     { id: "auto", label: "Auto", hint: "Use selection if present; otherwise use the entire note" },
@@ -1597,7 +1597,7 @@
     return AI_TARGET_MODES[0];
   }
 
-  /** 当前编辑器里的选区（没有选中则返回空串） */
+  /** Selection in the current editor (return empty string if not selected) */
   function aiSelection(ed) {
     if (!ed || ed.selectionStart == null || ed.selectionEnd == null) { return { text: "", start: 0, end: 0 }; }
     if (ed.selectionEnd <= ed.selectionStart) { return { text: "", start: ed.selectionStart || 0, end: ed.selectionEnd || 0 }; }
@@ -1609,10 +1609,10 @@
   }
 
   /**
-   * 当前要交给模型的对象。
-   * - `empty:true` 表示"没有可发送的正文"（已清除 / 未选中 / 笔记为空 / 根本没选笔记）：
-   *   调用方据此给出**不同**的提示与后续动作，别都笼统说成"没有内容"。
-   * - `noNote:true` 表示连笔记都没选（这时「提问」「续写」仍然可用）。
+   * Currently you want to give it to the object of the model.
+   * - `empty:true` configuration"No body to send"（Cleared / Not Selected / Notes are empty. / None of the notes:
+   *   The caller gives it on this basis**Different.**Not all the tips and follow-up."Nothing."。
+   * - `noNote:true` It means he didn't even pick his notes.「Ask」「Continue writing」It's still available.
    */
   function aiTarget() {
     var n = activeNote();
@@ -1646,7 +1646,7 @@
     };
   }
 
-  /** 有可发送的正文（生成按钮据此启停） */
+  /** Text to send (generated buttons to release) */
   function aiTargetUsable() {
     var tgt = aiTarget();
     return !!(tgt && !tgt.empty && String(tgt.text).trim());
@@ -1660,9 +1660,9 @@
   }
 
   /**
-   * 当前状态能不能发出去。
-   * 聊天模式：写下内容就能发（纯对话，不需要对象）。
-   * 创作模式：有正文就能发；没有正文时只有 noContext 任务（提问 / 续写）能跑，且要自己写下要求。
+   * The state can't be sent out.
+   * Chat mode: Write your content and send it (pure conversation, no object).
+   * Creative mode: text is available; text is available only when there is no text noContext Tasks (questions) / I can run and write my own requests.
    */
   function aiCanRun(cfg) {
     if (aiState.busy || !(cfg && cfg.ready)) { return false; }
@@ -1672,11 +1672,11 @@
     return !!aiInputText();
   }
 
-  /* ---------------- 模式：聊天 / 创作 ---------------- */
+  /* ---------------- Mode: Chat / Create ---------------- */
 
   /**
-   * 切换模式。聊天模式把「分析对象 + 任务」整块收起来 ——
-   * 那是创作才需要的东西，摆在纯对话栏里只会让人以为"必须先选个对象才能说话"。
+   * Switch mode. Chat Mode「Analysis target + Tasks」Put the whole piece away...
+   * That's what it takes to create."You have to choose someone to speak."。
    */
   function setAIMode(id) {
     var def = aiViewDef(id);
@@ -1684,8 +1684,8 @@
     renderAIMode();
     aiState.cfgPristine = true;
     syncAIConfigForm(aiState.cfg);
-    renderAITabs();         // 任务标签只在创作模式渲染；切回来必须补画一次
-    renderAILog();          // 空态提示语也要跟着模式变
+    renderAITabs();         // Task labels are rendered only in creative mode; cut back must be supplemented once
+    renderAILog();          // It's the same as the pattern.
     refreshAITargetUI();
   }
 
@@ -1706,11 +1706,11 @@
   }
 
   /**
-   * 画「分析对象」区：模式按钮高亮 + 对象摘要 + 内容预览。
-   * 预览是重点 —— 用户必须能一眼看出"到底要发什么出去"，否则就只能靠猜。
+   * Paint「Analysis target」Area: Mode button highlight + Object Summary + Text preview.
+   * The preview is the focus -- the user must be able to see it."What are you sending out?"，Otherwise, we have to guess.
    */
   function renderAITarget() {
-    if (!aiState.open || aiIsChat()) { return; }   // 聊天模式没有分析对象
+    if (!aiState.open || aiIsChat()) { return; }   // Chat mode does not analyse objects
     AI_TARGET_MODES.forEach(function (def) {
       var b = $("aip-mode-" + def.id);
       if (!b) { return; }
@@ -1781,9 +1781,9 @@
   }
 
   /**
-   * 刷新「分析对象」相关的全部 UI：对象区 + 状态行 + 生成按钮。
-   * 三处必须一起刷新 —— 只刷对象区会出现「对象写的是选中内容、状态行还写着整篇笔记」这种自相矛盾
-   * （e2e 里真抓到过），用户就不知道该信哪个。
+   * Refresh「Analysis target」All relevant UI：Object Area + Status Line + Generates a button.
+   * Three places must be refreshed together -- only the object area will appear.「The object writes the selection, the status line, the whole note.」This paradox.
+   * （e2e They don't know which one.
    */
   function refreshAITargetUI() {
     renderAITarget();
@@ -1792,15 +1792,15 @@
     setAIReady(aiState.cfg);
   }
 
-  // 编辑器里的划选/输入都要让「分析对象」实时跟着变 —— 否则又会变成"钉死的旧值"。
-  // 用 addEventListener 而不是 on("editor", ...)：编辑器已经用属性方式挂了 oninput/onblur，
-  // 属性赋值会把它整个顶掉。
+  // Selection in Editor/I want it all.「Analysis target」It changes in real time -- otherwise it becomes..."Old crucified value."。
+  // Use addEventListener Not on("editor", ...)：The editor has already hung up by attribute. oninput/onblur，
+  // The attribute will topple it.
   var aiTargetTimer = null;
   function refreshAITargetSoon() {
     if (!aiState.open || aiTargetTimer) { return; }
     aiTargetTimer = setTimeout(function () {
       aiTargetTimer = null;
-      try { refreshAITargetUI(); } catch (e) { /* 纯展示，失败不影响主流程 */ }
+      try { refreshAITargetUI(); } catch (e) { /* Pure display. Failure does not affect the main process. */ }
     }, 60);
   }
 
@@ -1818,7 +1818,7 @@
   function renderAITabs() {
     var go = $("aip-go");
     if (aiIsChat()) {
-      // 聊天模式：只发一句话，按钮就叫「发送」
+      // Chat mode: One sentence, the button is called「Send」
       if (go) { go.textContent = "Send"; }
       return;
     }
@@ -1870,7 +1870,7 @@
     if (kind) { el.setAttribute("data-kind", kind); } else { el.removeAttribute("data-kind"); }
   }
 
-  /** 把服务端配置填回弹框表单（仅在用户还没改过表单时覆盖，避免把正在输入的内容冲掉） */
+  /** Fill in the dialog form for the service-end configuration (only if the user has not changed the form to avoid flushing the input) */
   function syncAIConfigForm(cfg) {
     if (!cfg || !aiState.cfgPristine) { return; }
     var set = function (id, v) { var e = $(id); if (e) { e.value = v; } };
@@ -1883,10 +1883,10 @@
     set("aic-timeout", cfg.timeoutSecs || 60);
     set("aic-maxchars", cfg.maxChars || 12000);
     chk("aic-remember", cfg.rememberKey);
-    set("aic-key", "");   // 密钥从不回传，永远是空的（留空 = 不改）
+    set("aic-key", "");   // The key never returns. It's always empty. = No change)
   }
 
-  /** 发送按钮的可用性 = 配置就绪 +（聊天：写了内容 / 创作：有对象或该任务可无对象且写了要求） */
+  /** Availability of sending buttons = Configure Ready +（Chat: wrote about / (b) Creation: the object or the mission may not be object-free and the requirement is written) */
   function setAIReady(cfg) {
     var go = $("aip-go");
     if (!go) { return; }
@@ -1899,7 +1899,7 @@
       var miss = (cfg.missing || []).map(function (k) { return AI_MISSING_LABEL[k] || k; });
       return "Missing: " + miss.join(", ") + " — click ⚙ in the top right to configure";
     }
-    // 聊天模式：只发你写的话，不带任何笔记内容
+    // Chat mode: Send only your words without any notes
     if (aiIsChat()) {
       var msg = aiInputText();
       return msg ? ("Ready · sending message (" + aiCharCount(msg) + " chars, without note content)")
@@ -1912,7 +1912,7 @@
       var cap = cfg.maxChars || 12000;
       return "Ready · will send " + tgt.label + " (" + n + " chars)" + (n > cap ? ", will be truncated to " + cap : "");
     }
-    // 没有正文：只有「提问」「续写」能继续，且必须自己写下问题/要求
+    // No text: Only「Ask」「Continue writing」I can go on, and I have to write the questions myself./Request
     if (!def.noContext) {
       var why = "No text content available to send";
       if (tgt && tgt.noNote) { why = "No note selected"; }
@@ -1927,7 +1927,7 @@
     return "No note content · will " + (def.id === "ask" ? "answer" : "generate") + " based on your instructions";
   }
 
-  /** 拉一次配置：刷新表单、标题、状态与按钮可用性 */
+  /** Pull configuration once: refresh forms, titles, status and button availability */
   function refreshAIConfig(quiet) {
     return S.aiConfig().then(function (cfg) {
       aiState.cfg = cfg;
@@ -1935,14 +1935,14 @@
       renderAIModel();
       refreshAITargetUI();
       if (!quiet && cfg && !cfg.ready && aiState.cfgPristine) {
-        // 首次打开就发现没配对：直接把配置弹框打开，省去"为什么点不动"的困惑
+        // When you open it for the first time, you find there's no match: just open the frame and save it."Why isn't it moving?"The confusion.
         openAIConfigModal();
       }
       return cfg;
     });
   }
 
-  /* ---------------- 配置弹框（不占聊天区） ---------------- */
+  /* ---------------- Configure bullet frames (no chat area) ---------------- */
 
   function openAIConfigModal() {
     var m = $("ai-cfg-modal");
@@ -1980,11 +1980,11 @@
     var m = parseInt(val("aic-maxchars"), 10);
     if (m > 0) { cfg.maxChars = m; }
     var key = val("aic-key");
-    if (key.trim()) { cfg.apiKey = key.trim(); }   // 留空 = 不修改
+    if (key.trim()) { cfg.apiKey = key.trim(); }   // Leave space. = Do Not Modify
     return cfg;
   }
 
-  /** persist=true 落盘（长期有效）；false 只用于「测试连接」，不写入配置文件 */
+  /** persist=true (a) Crash (permanent validity);false For Only「Test connection」，Do Not Write Profile */
   function submitAIConfig(persist) {
     aiConfigMsg(persist ? "Saving…" : "Applying (not saving)…", "");
     return S.aiSetConfig(collectAIConfigForm(), persist).then(function (view) {
@@ -1999,7 +1999,7 @@
           : (view.hasKey ? "Configuration saved (API key valid for this session only; “Remember key on this machine” unchecked)" : "Configuration saved");
         aiConfigMsg(where, "ok");
         toast("AI configuration saved");
-        // 存完就没什么要看的了，收起弹框（有错时留着让用户看）
+        // There's nothing left to look at when you're done.
         closeAIConfigModal();
       } else {
         aiConfigMsg("Settings applied but not saved: click “Save” to keep them permanently", "");
@@ -2048,12 +2048,12 @@
     });
   }
 
-  /* ---------------- 会话记录（每条结果都有四个操作） ---------------- */
+  /* ---------------- Session records (four operations per result) ---------------- */
 
   function aiHintEl() {
     var d = document.createElement("div");
     d.className = "aip-hint";
-    // 提示语要跟着模式变：聊天模式下说"选一种任务"会让人以为还得先选点什么
+    // The hint will be changed in mode: in chat mode"Pick a task."It'll make people think they need to pick something first.
     var lines = aiIsChat()
       ? ["Chat directly with AI here (text only, no note content sent).",
          "To analyze a note or write results back, switch to “Compose” above.",
@@ -2068,8 +2068,8 @@
     return d;
   }
 
-  // 创作模式：结果是要写进笔记的，四个操作都要；
-  // 聊天模式：纯对话，没有"要写回哪儿"这回事，只留「复制」。
+  // (a) Creative mode: the result is written in notes, all four;
+  // Chat mode: pure conversation, no"Where to write back?"That's all. Just stay.「Copy」。
   var AI_OPS_CREATE = [
     { op: "insert", text: "Insert at cursor" },
     { op: "replace", text: "Replace selection" },
@@ -2124,7 +2124,7 @@
     if (!en.error && en.result) {
       var acts = document.createElement("div");
       acts.className = "aip-entry-actions";
-      // 聊天条目只留「复制」；创作条目才带四个写回操作
+      // Only chat entries「Copy」；Only four writebacks for creation entries
       (en.kind === "chat" ? AI_OPS_CHAT : AI_OPS_CREATE).forEach(function (def) {
         var b = document.createElement("button");
         b.type = "button";
@@ -2146,7 +2146,7 @@
       return;
     }
     aiState.entries.forEach(function (en) { log.appendChild(aiEntryEl(en)); });
-    // 滚动的容器是 #aip-scroll（上半区整体滚动，底栏固定）；拿不到就退回 log 自己
+    // The rolling container is... #aip-scroll（Scroll as a whole in the first half, with a fixed bottom bar; return if it is not available log For yourself.
     var sc = $("aip-scroll") || log;
     sc.scrollTop = sc.scrollHeight;
   }
@@ -2158,12 +2158,12 @@
     toast("Conversation history cleared");
   }
 
-  /* ---------------- 执行任务 ---------------- */
+  /* ---------------- Mission ---------------- */
 
   function runAITask() {
     if (aiState.busy) { return; }
     var chat = aiIsChat();
-    // 聊天模式：没有任务、没有对象，就是把你说的话发出去（task 用 ask，text 为空 = 不带笔记）
+    // Chat mode: no mission, no object, just send out what you say.task Use ask，text empty = No notes.
     var def = chat ? { id: "ask", label: "Chat", go: "Send", noContext: true } : aiTaskDef(aiState.task);
     var tgt = chat ? null : aiTarget();
     var extra = aiInputText();
@@ -2176,7 +2176,7 @@
       toast(hasText ? "Enter your question below first" : "Enter your question below first (you can ask without a note)", "warn");
       return;
     } else if (!hasText) {
-      // 没有正文：只有 noContext 的任务能跑，且必须自己写下问题/要求
+      // No text: Only noContext The mission can run, and we have to write the questions./Request
       if (!def.noContext) { toast(aiReadyText(aiState.cfg), "warn"); return; }
       if (!extra) { toast("Describe what to write below first", "warn"); return; }
     }
@@ -2188,7 +2188,7 @@
       noteId: (tgt && tgt.note) ? tgt.note.id : null,
       noteName: (tgt && tgt.note) ? String(tgt.note.name || "") : "",
       instruction: extra,
-      // 「选中内容」/「整篇笔记」/「不带笔记内容」—— 记录本次实际用了什么
+      // 「Selection」/「Entire note」/「without note content」—— Record what it actually used.
       targetLabel: hasText ? tgt.label : "No note content",
       hasSelection: hasText && !!tgt.hasSelection,
       scopeChars: hasText ? aiCharCount(text) : 0,
@@ -2227,7 +2227,7 @@
     });
   }
 
-  /* ---------------- 结果回写（四个操作） ---------------- */
+  /* ---------------- Resultback (four operations) ---------------- */
 
   function currentSelection(ed) {
     if (!ed || ed.selectionStart == null || ed.selectionEnd == null) { return null; }
@@ -2240,8 +2240,8 @@
     var n = activeNote();
     if (!ed || !n) { toast("Select a note on the left first", "warn"); return; }
     if (en.noteId && n.id !== en.noteId) {
-      // 结果来自另一篇笔记：写进去几乎一定是误操作，先问一句
-      // （noteId 为 null = 生成时就没带笔记，不存在"串笔记"的问题，直接写）
+      // The result came from another note: it was almost certainly a mistake to write in.
+      // （noteId Yes null = They didn't have any notes. They didn't exist."Serial Notes"Question, write directly)
       confirmListModal("This result is from a different note", [
         "Result generated from: “" + en.noteName + "”",
         "Currently editing: “" + String(n.name || "") + "”",
@@ -2272,7 +2272,7 @@
       return;
     }
 
-    // 换行/覆盖都会改动已有正文，一律先确认（选中时的「插入」其实也是替换）
+    // Line Break/The text is always changed to cover.「Insert」It's a replacement.
     if (op === "replace" || sel) {
       if (!sel) { toast("No text selected; cannot replace", "warn"); return; }
       var oldText = v.slice(sel.start, sel.end);
@@ -2287,7 +2287,7 @@
       ], "Replace").then(function (ok) {
         if (!ok) { return; }
         var cur = String(ed.value || "");
-        // 确认框期间用户可能又改了正文：范围越界就放弃，绝不写坏
+        // During the confirmation box, the user may have changed the text again: the range is abandoned and never bad.
         if (sel.end > cur.length) { toast("Content changed; please reselect before replacing", "warn"); return; }
         ed.value = cur.slice(0, sel.start) + result + cur.slice(sel.end);
         ed.selectionStart = ed.selectionEnd = sel.start + result.length;
@@ -2297,7 +2297,7 @@
       return;
     }
 
-    // 无选区 → 纯插入，不动任何已有正文
+    // No Selection → Purely insert, without moving any existing body
     var at = (ed.selectionStart == null) ? v.length : ed.selectionStart;
     ed.value = v.slice(0, at) + result + v.slice(at);
     ed.selectionStart = ed.selectionEnd = at + result.length;
@@ -2313,10 +2313,10 @@
     renderPreview();
     updateCounter();
     renderTree();
-    renderAITarget();   // 正文被 AI 结果改写了，对象预览要跟着更新
+    renderAITarget();   // Text by AI It's rewritten. The object preview is updated.
   }
 
-  /* ---------------- 面板开关 ---------------- */
+  /* ---------------- Panel Switch ---------------- */
 
   function setAIPanelOpen(open) {
     aiState.open = !!open;
@@ -2338,8 +2338,8 @@
   }
 
   /**
-   * 打开面板。task 省略时保持当前模式（默认聊天）。
-   * 右键菜单的「AI 分析 / AI 润色 / AI 续写 / 问 AI」属于处理笔记的用法 —— 自动切到创作模式。
+   * Open the panel.task Keeps the current mode (default chat) while omitting.
+   * Right-click menu「AI Analyze / AI Polish / AI Continue writing / Question AI」The use of which to process notes - automatically to create mode.
    */
   function openAIPanel(task) {
     if (task) {
@@ -2359,9 +2359,9 @@
 
   function toggleAIPanel() { setAIPanelOpen(!aiState.open); }
 
-  /* ---------------- 三栏宽度（拖动分隔条） ----------------
-   * 宽度存在侧车（<dataDir>/prefs.json）：沙箱里 window.origin 是 "null"（opaque origin），
-   * 访问 localStorage 会直接抛 SecurityError；也不该塞进笔记数据里 —— 这是每台机器的界面偏好。
+  /* ---------------- Three-column width (towed partition) ----------------
+   * Width exists on side vehicle (<dataDir>/prefs.json）：In the sandbox. window.origin yes "null"（opaque origin），
+   * Visits localStorage It'll just throw. SecurityError；Nor should it be inserted in the notes -- this is the interface for every machine.
    */
   var SIDE_MIN = 180, SIDE_MAX = 720, SIDE_DEFAULT = 272;
   var AI_MIN = 280, AI_MAX = 720, AI_DEFAULT = 400;
@@ -2398,9 +2398,9 @@
   }
 
   /**
-   * 把一条分隔条接上指针拖拽。
-   * 用指针事件 + setPointerCapture 自实现：沙箱里 HTML5 拖拽（dragstart/drop）会出禁止光标，
-   * 而且它在 iframe 里也拿不到跨元素坐标。
+   * Drag a partition line to the pointer.
+   * Pointer Event + setPointerCapture Self-realization: in sandboxes HTML5 Dragdragstart/drop）It'll be banned.
+   * And it's... iframe There are no cross-element coordinates.
    */
   function bindGutter(el, opts) {
     if (!el) { return; }
@@ -2434,13 +2434,13 @@
       var b = document.body;
       if (b && b.classList) { b.classList.add("resizing"); }
     });
-    // move / up 挂在 document 上，而不是分隔条自己：
-    // 指针一旦移出分隔条（拖快一点就会），挂在元素上就收不到 pointermove，
-    // 表现成「拖一半断掉」；setPointerCapture 在部分环境（如测试用的 jsdom）并不存在。
+    // move / up Hang on document Up, not the partition itself:
+    // Once the pointer moves out of the partition, you can't get it on the elements. pointermove，
+    // Assemble「Half of it is broken.」；setPointerCapture In some environments (e.g. for testing) jsdom）It doesn't exist.
     document.addEventListener("pointermove", move);
     document.addEventListener("pointerup", stop);
     document.addEventListener("pointercancel", stop);
-    // 双击复位到默认宽度：拖歪了不用一点点挪回来
+    // Double-click to default width: a little bit less to drag back
     el.addEventListener("dblclick", function () {
       layout[opts.key] = opts.def;
       applyLayout();
@@ -2454,17 +2454,17 @@
     applyLayout();
   }
 
-  /** 启动早期：立刻把分隔条接上（纯 DOM，不依赖侧车） */
+  /** Early start-up: connect the partition immediately. DOM，I don't rely on sidecars) */
   function initChrome() {
     initGutters();
   }
 
-  /** 存储就绪后：读回上次的宽度与面板开关（要发 RPC，所以不能更早） */
+  /** Storage ready: Read back the previous width and panel switch (to send) RPC，That's why we can't be earlier. */
   function restoreChromePrefs() {
-    return loadLayout().catch(function () { /* 偏好读不到不影响主流程 */ });
+    return loadLayout().catch(function () { /* Prefer to not read without affecting the main process */ });
   }
 
-  // ---------------- 事件绑定 ----------------
+  // ---------------- Event binding ----------------
   function bindEvents() {
     click("btn-new-note", function () { createNote("Untitled note", targetFolderId(), ""); });
     click("btn-new-folder", function () { newFolderFlow(targetFolderId()); });
@@ -2476,38 +2476,38 @@
 
     click("btn-table-note", function () { openTableModal(null); });
     click("btn-insert-sql", insertSqlBlock);
-    // 工具栏的「AI 助手」是开/关（常驻右栏），不是弹窗；右键菜单则会带上具体任务
+    // toolbar「AI Assistant」It's open./Off (relative right) not a dialog; right-click menu with specific tasks
     click("btn-ai", toggleAIPanel);
     click("aip-close", function () { setAIPanelOpen(false); });
     click("aip-cfg-toggle", openAIConfigModal);
     click("aip-clear-log", clearAILog);
     click("aip-go", runAITask);
-    // 模式：聊天（默认）/ 创作
+    // Mode: Chat (default)/ Create
     AI_VIEWS.forEach(function (def) {
       click("aip-view-" + def.id, function () { setAIMode(def.id); });
     });
-    // 配置弹框
+    // Configure Dialog Boxes
     click("aic-save", function () { submitAIConfig(true); });
     click("aic-test", testAIConfig);
     click("aic-clear", clearLocalAIConfig);
     click("aic-cancel", closeAIConfigModal);
     click("ai-cfg-modal", function (e) { if (e.target === $("ai-cfg-modal")) { closeAIConfigModal(); } });
-    // 分析对象：四种来源（自动跟随 / 选中内容 / 整篇笔记 / 清除）
+    // Subject: Four sources (automatic follow-up) / Selection / Entire note / Clear)
     AI_TARGET_MODES.forEach(function (def) {
       click("aip-mode-" + def.id, function () { setAITargetMode(def.id); });
     });
-    // 划选、输入都要让对象实时跟着变（编辑器已用属性方式挂了 oninput，所以走 addEventListener）
+    // Select and enter objects in real time. oninput，So go. addEventListener）
     bindAITargetWatch();
-    // 「没有正文」时，发送按钮的可用性取决于你写没写问题/要求 —— 输入框也要触发刷新
+    // 「No text.」, the availability of sending buttons depends on whether you write or not./Request - input box also trigger refreshing
     on("aip-input", "oninput", refreshAITargetSoon);
-    // 用户一改表单就不再让服务端值覆盖它（否则「保存失败 → 重填」时会白填一遍）
+    // As soon as the user changes the form, the service end will no longer be covered by it (otherwise)「Save Failed → Refill」It will be filled out in vain.
     on("ai-cfg-modal", "oninput", function () { aiState.cfgPristine = false; });
     on("ai-cfg-modal", "onchange", function () { aiState.cfgPristine = false; });
-    // 注意：index.html 里 #btn-copy-sql 目前是注释状态，这里必须用安全绑定（optional=true），
-    // 否则整个 bindEvents 会在此处中断（2026-09-21 实际事故：所有按钮点不动 + 笔记从不落盘）。
+    // Note:index.html Lee. #btn-copy-sql It's an annotated state, and it has to be secured here.optional=true），
+    // Or the whole thing. bindEvents Interrupted here.2026-09-21 Actual accident: All buttons remain intact + The notes never drop.
     click("btn-copy-sql", copySqlToDbx, true);
     click("btn-export-md", function () { exportNote(activeNote()); });
-    // 导入功能暂时下线（ENABLE_IMPORT=false）：入口与绑定一起摘掉，避免出现点了没反应的按钮。
+    // Import function temporarily down (ENABLE_IMPORT=false）：The entrance was removed along with the binding, avoiding the presence of unresponsive buttons.
     if (ENABLE_IMPORT) { click("btn-import-md", pickImportFiles); }
     click("btn-backup-zip", backupAll);
     click("btn-restore-zip", restoreFlow);
@@ -2590,20 +2590,20 @@
       applyTheme();
     });
 
-    // 目录空白处右键 → 根目录菜单
+    // Right button in directory blank → Root Directory Menu
     on("tree", "oncontextmenu", function (e) {
       if (e.target !== $("tree")) { return; }
       e.preventDefault();
       showCtxMenu(e.clientX, e.clientY, null);
     });
 
-    // 置顶诊断条上的按钮：随 SHOW_DIAG_BAR 一起下线（元素已注释，绑定会打日志噪音）。
-    // 需要排障时连同上面的开关一起放开：
+    // Put the button on the top diagnostic bar: SHOW_DIAG_BAR Together, offline (Elements are commented and bound to log noise).
+    // If you need a barrier to release with the switch above:
     // click("diag-toggle", function () { diagOpen = !diagOpen; renderDiag(); });
     // click("diag-copy", function () { copyText(S.report(), "diagnostic report"); });
     // click("diag-detail", openStoreModal);
 
-    // 状态栏胶囊 → 状态详情弹窗
+    // Status Bar capsule → Status Details Dialog Window
     click("store-status", openStoreModal);
 
     document.addEventListener("keydown", function (e) {
@@ -2625,7 +2625,7 @@
         return;
       }
       if (mod && e.key === "Enter" && aiState.open) {
-        // 在 AI 栏的输入框里按 Ctrl/Cmd+Enter 直接执行当前任务
+        // AI Press in the input box of the bar Ctrl/Cmd+Enter Directly perform current tasks
         e.preventDefault();
         runAITask();
         return;
@@ -2645,7 +2645,7 @@
 
     document.addEventListener("click", function () { closeCtxMenu(); });
 
-    // 主题跟随 DBX
+    // Theme Follow DBX
     window.addEventListener("dbx-plugin-env", function () { applyTheme(); });
     if (window.matchMedia) {
       try {
@@ -2656,8 +2656,8 @@
     }
   }
 
-  // ---------------- 启动 ----------------
-  /** 读取侧车实际在用的笔记存储目录（由 storage.js 从连接配置里解析） */
+  // ---------------- Start ----------------
+  /** Read the notebook directory actually used by the sidecar storage.js Parsing from Connection Configuration) */
   function readConfiguredDir() {
     try {
       var st = S.status();
@@ -2668,7 +2668,7 @@
   function boot() {
     S.log("Frontend boot started", null, "readyState=" + document.readyState);
 
-    // 状态/日志一变就刷新状态栏 + 置顶诊断条
+    // Status/Refresh status bar as soon as the log changes + Top bar
     S.onStatus(function () {
       try { renderStatus(); renderDiag(); } catch (e) { /* ignore */ }
     });
@@ -2690,7 +2690,7 @@
       renderDiag(S.status());
       S.log("Frontend UI ready", true, "Button bindings complete (top diagnostic bar offline); initializing storage via init()");
     } catch (e) {
-      // 关键：任何前置阶段出错也要把诊断条画出来，否则用户只会看到一个死界面
+      // Key: If you make a mistake at any pre-emptive stage, draw a diagnostic note, otherwise the user will see only one dead end. Noodles.
       S.log("Frontend boot interrupted", false, phase + " phase threw error: " + ((e && e.message) || String(e)));
       try { renderDiag(S.status()); } catch (e2) { /* ignore */ }
       try { toast("UI initialization error; check diagnostics at the top", "warn"); } catch (e2) { /* ignore */ }
@@ -2724,9 +2724,9 @@
         state.deletedIds = [];
         indexContentMissing(data.nodes);
       } else if (res.firstRun && S.status().persistent) {
-        // 只有「确实没有任何数据」时才放示例笔记；读成空数组绝不重新初始化，
-        // 否则用户删空笔记后每次打开都会把示例塞回来。
-        // 存储不可持久化时也不放：否则会塞进一批根本存不下的假数据，掩盖真实故障。
+        // Only 「There is no data.」; reading to an empty array will never re-initiate.
+        // Otherwise, every time a user removes a note, the example is plugged back.
+        // If storage is not sustainable, it is not released: otherwise it will be plugged into a collection of false data that cannot be stored and will cover up real failures.
         seed();
         seeded = true;
       }
@@ -2745,16 +2745,16 @@
       handleHostContext();
       render();
       renderDiag(S.status());
-      // 宽度与「上次是否开着 AI 栏」存在侧车（插件数据目录），这里读回来
+      // Width &「Did it last time? AI Column」There's a sidecar.
       restoreChromePrefs();
-      // 启动时【绝不】保存整份快照。
+      // Keep the whole snapshot on startup.
       //
-      // 以前这里无条件 persist(false)"写一次验证可写"，代价是把本实例的旧快照推成权威状态：
-      // 同一个存储目录被第二个连接打开时，先打开的那个实例只要被打开一次，就会用它手里的
-      // 旧列表覆盖索引（新增的笔记当场被删，改过的正文被回滚）。
-      // 现在拆成两件事：
-      //   - 可写性 → 用非破坏性的 notes/probe（只写 .mdnotes/ 里的探针文件）
-      //   - 真有新数据要落盘（空目录首用 seed 了示例笔记）→ 才保存
+      // It used to be unconditional. persist(false)"Write a check to write."，The price is to push the old snapshot of this example into a state of authority:
+      // When the same memory directory is opened by the second connection, the example that was opened first will be used by it once.
+      // The old list overwrites the index (the new notes are deleted on the spot and the changed text is rolled back).
+      // Now two things:
+      //   - Writeability → Use non-destructive. notes/probe（Write Only .mdnotes/ In the probe file)
+      //   - There's really new data to drop. seed )→ Only to save
       probeWritable();
       if (seeded) { persist(false); }
     }).catch(function (e) {
@@ -2763,7 +2763,7 @@
     });
   }
 
-  /** 非破坏性可写性探测：不碰索引、不碰正文，只写 .mdnotes/ 下的探针文件 */
+  /** Non-destructive writeability detection: no index, no text, only written .mdnotes/ Lower probe file */
   function probeWritable() {
     return S.invoke("notes/probe", {}).then(function (r) {
       if (r && r.ok === false) {
@@ -2773,17 +2773,17 @@
       }
       return !!(r && r.ok !== false);
     }).catch(function (e) {
-      // 老版本侧车没有 notes/probe：退化成 ping（同样不写任何数据）
+      // The old sidecar didn't. notes/probe：Degraded. ping（No data.
       S.log("Writability probe unavailable, falling back to ping", false, (e && e.message) || String(e));
       return true;
     });
   }
 
-  /* ---------------- 启动 ----------------
-   * 立即启动，不等 dbxPlugin.ready。
-   * 旧写法是 `dbxPlugin.ready.then(boot)`：一旦 ready 因为任何原因不 resolve，
-   * 整个 UI 永远停在初始状态（按钮全死、状态永远 unknown），而且没有任何报错。
-   * storage.js 内部自己会 await ready（带 8 秒超时兜底），外层不需要再等一次。
+  /* ---------------- Start ----------------
+   * Start immediately. Wait. dbxPlugin.ready。
+   * Old version: `dbxPlugin.ready.then(boot)`：Once ready For any reason. resolve，
+   * Whole UI Always stop at the initial state (buttons all dead, status forever) unknown），And there are no mistakes.
+   * storage.js Inside himself. await ready（And... 8 The outer layer does not need to wait again.
    */
   var booted = false;
   function bootOnce(why) {
@@ -2803,6 +2803,6 @@
   } else {
     bootOnce("DOM ready when script executed (readyState=" + document.readyState + ")");
   }
-  // 兜底：万一 DOMContentLoaded 没触发（历史事故里出现过界面完全不动的情况），3 秒后强制启动一次
+  // Bottom: in case DOMContentLoaded It was not triggered (in a historical accident, the interface was completely intact).3 Force start in seconds.
   setTimeout(function () { bootOnce("Fallback timer 3s"); }, 3000);
 })();

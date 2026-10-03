@@ -1,9 +1,9 @@
-// MD 笔记 —— DBX 插件侧车模块
+// MD Notes... DBX Plugin side vehicle module
 //
-// 依赖策略：零外部依赖。
-// 官方 SDK 未发布到 Go 模块代理（go get 报 unknown revision），且其 go.mod 声明 go 1.22，
-// 独立引入会让低版本工具链无法构建；因此把官方 sdk.go 原样 vendor 为 ./dbxsdk 包，
-// 与本模块一起编译，仅需 Go 1.20+，且离线可构建。
+// Dependency strategy: zero external dependency.
+// Official SDK Unpublished to Go Module Proxygo get Report unknown revision），And... go.mod Statement go 1.22，
+// The introduction of independence will make the low-end tool chain impossible to build; hence, the official sdk.go As it is. vendor Yes ./dbxsdk The bag.
+// Compiled with this module only Go 1.20+，And offline.
 module github.com/lwai/mdnotes
 
 go 1.20

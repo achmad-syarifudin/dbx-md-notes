@@ -1,8 +1,8 @@
 /*
- * SQL 语法高亮（无外部依赖）
- * 暴露：window.MDNotes.highlightSQL(sql) -> HTML 字符串（已转义）
- * 覆盖：行注释 -- 、块注释 /* *\/ 、字符串 '...' 与 "..." 与 `...`、
- *       数字、关键字（通用 SQL + DBX 数据库场景常见词）、操作符。
+ * SQL Highlighting (no external dependence)
+ * Exposure:window.MDNotes.highlightSQL(sql) -> HTML String (transformed)
+ * Overwrite: Line Comment -- 、Block Comment /* *\/ 、String '...' with "..." with `...`、
+ *       Numbers, keywords (general SQL + DBX Database scene common words, operators.
  */
 (function () {
   "use strict";
@@ -37,17 +37,17 @@
     while (i < n) {
       var c = sql[i];
 
-      // 行注释
+      // Line Comment
       if (c === "-" && sql[i + 1] === "-") {
         var j = sql.indexOf("\n", i); if (j < 0) { j = n; }
         push("tok-com", sql.slice(i, j)); i = j; continue;
       }
-      // 块注释
+      // Block Comment
       if (c === "/" && sql[i + 1] === "*") {
         var e = sql.indexOf("*/", i + 2); e = (e < 0 ? n : e + 2);
         push("tok-com", sql.slice(i, e)); i = e; continue;
       }
-      // 单引号字符串（支持 '' 转义）
+      // Single quote string (support) '' Conversion)
       if (c === "'") {
         var k1 = i + 1;
         while (k1 < n) {
@@ -57,19 +57,19 @@
         var end1 = (k1 < n) ? k1 + 1 : n;
         push("tok-str", sql.slice(i, end1)); i = end1; continue;
       }
-      // 双引号 / 反引号 标识符或字符串
+      // Double quote / Inverted quotation marks
       if (c === '"' || c === "`") {
         var q = c, m = i + 1;
         while (m < n && sql[m] !== q) { m++; }
         var e2 = (m < n) ? m + 1 : n;
         push("tok-id", sql.slice(i, e2)); i = e2; continue;
       }
-      // 数字
+      // Numbers
       if (c >= "0" && c <= "9") {
         var p = i; while (p < n && /[0-9.]/.test(sql[p])) { p++; }
         push("tok-num", sql.slice(i, p)); i = p; continue;
       }
-      // 单词（关键字 / 标识符）
+      // Words (keywords) / Identification)
       if (/[A-Za-z_]/.test(c)) {
         var w = i; while (w < n && /[A-Za-z0-9_]/.test(sql[w])) { w++; }
         var word = sql.slice(i, w);
@@ -77,11 +77,11 @@
         else { push("tok-id", word); }
         i = w; continue;
       }
-      // 操作符 / 标点
+      // Operator / Points
       if ("=<>+-*/%.,();:".indexOf(c) >= 0) {
         push("tok-op", c); i++; continue;
       }
-      // 其它（空白等）
+      // Other (empty, etc.)
       push(null, c); i++;
     }
     return out.join("");

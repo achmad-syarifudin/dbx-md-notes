@@ -1,381 +1,381 @@
-# AI.MD 笔记（Markdown Notes）
+# AI.MD NotesMarkdown Notes）
 
-> DBX 插件 · 连接类型式的 Markdown 笔记工作台
+> DBX Plugin . Connection type Markdown Note desk
 
-把笔记做成 DBX 里的一个**连接类型**：新建「AI.MD 笔记」连接 → 打开独立工作台（左侧目录树 + 右侧编辑器/实时预览）。
-笔记落盘为**存储目录下的真实 `.md` 文件**，因此在 DBX 里能编辑，在 DBX 外也能用任何编辑器打开、能被 grep、能进 Git。
+Make your notes. DBX One of them.**Connection Type**：New「AI.MD Notes」Connection → Open a stand-alone table (left directory tree) + Right Editor/A real-time preview.
+The note drops as**Real under Storage Directory `.md` Documentation**，So in DBX I can edit it. DBX It can be opened with any editor. grep、Git。
 
 ---
 
-## 功能
+## Functions
 
-| 能力 | 说明 |
+| Capacity | Annotations |
 | --- | --- |
-| 目录树 | 文件夹 = 真实子目录；支持**拖拽移动**（含整棵子树）、重命名、右键菜单 |
-| 编辑与预览 | 编辑/预览/分栏三视图；无依赖的 Markdown 渲染（标题、列表、表格、引用、任务列表、行内代码…） |
-| SQL 高亮 | ` ```sql ` 代码块语法高亮，贴合 DBX 数据库场景 |
-| 与表联动 | 「为表新建笔记」把当前连接/表上下文带进新笔记，自动生成字段表格骨架 |
-| 搜索 | 标题 + 正文全文检索 |
-| 导入/导出 | 导出单篇 `.md`、导出文件夹为 zip —— 走宿主原生「另存为」，**目录和文件名由你选** |
-| 备份/恢复 | 一键备份全部（zip，含配置与目录树索引），可从备份**原样恢复**层级与标题 |
-| **AI 助手** | **右侧常驻栏**：默认**聊天**模式（纯对话）；切到**创作**模式即可指定分析对象，对笔记做**分析、润色、续写、问答**，结果支持插入/替换/追加/复制；模型参数走独立配置弹框（见 [AI 助手](#ai-助手)） |
-| 可调栏宽 | 目录区 / 笔记区 / AI 区之间可**拖动分隔条**调宽，双击复位；宽度记在本机（见 [AI 助手](#ai-助手)） |
-| 删除安全 | 删除进回收站而非销毁；多连接共用同一目录互不覆盖（见[数据安全](#数据安全)） |
-| 文件系统 | 把笔记投影成 `mdnotes://` 虚拟文件系统，交给 DBX 通用文件管理器浏览/编辑 |
-| 主题 | 跟随宿主明暗主题 |
+| Directory Tree | Folder = real subdirectories;support**Drag Move**（A whole subtree, renaming, right-click menu |
+| Edit and Preview | Edit/Preview/column three views;no dependent Markdown Rendering (titles, lists, tables, references, tasklists, line codes...) |
+| SQL Highlight | ` ```sql ` The code block is high-profile, it fits. DBX Database scene |
+| Link to watch | 「New note for table」Connect Current/Add new notes to the table context and automatically generate field table skeletons |
+| Search | Title + Full text search |
+| Import/Export | Export One Part `.md`、Export Folder As zip —— It's the host.「Save As」，**You pick the directories and file names.** |
+| Backup/Restore | One-key backup all (zip，Includes configuration and directory tree index) from backup**Restore original**Level and Title |
+| **AI Assistant** | **persistent right sidebar**：Default**Chat**Mode (pure dialogue); to**Create**Mode allows you to assign an object to the analysis and to take notes**Analysis, refinement, continuation, questions and answers**，Result supports insertion/Replace/Append/copying;model parameters go independent configuration frames (see [AI Assistant](#ai-Assistant)） |
+| Resizeable | Contents / Note area / AI Between districts.**Drag Separator**Widening, double-buttoned bits; width recorder (see [AI Assistant](#ai-Assistant)） |
+| Delete Security | Delete access to the trash instead of destruction; multiple connections to share the same directory without covering each other (see[Data security](#Data security)） |
+| File System | Project the notes. `mdnotes://` Virtual file system. DBX General File Manager Browser/Edit |
+| Theme | Follow host's dark theme |
 
-**快捷键**：`Ctrl/Cmd+S` 保存 · `Ctrl/Cmd+N` 新建笔记 · `Ctrl/Cmd+I` 开合 AI 助手栏 · （AI 栏聚焦时）`Ctrl/Cmd+Enter` 执行当前任务 · `/` 聚焦搜索 · `Esc` 关闭弹窗。
+**Shortcut**：`Ctrl/Cmd+S` Save... `Ctrl/Cmd+N` New Note... `Ctrl/Cmd+I` Open AI Assistant Bar ()AI Column Focus)`Ctrl/Cmd+Enter` Carry out current tasks `/` Focus search. `Esc` Close the dialog.
 
 ---
 
-## AI 助手
+## AI Assistant
 
-AI 助手是**右侧一栏常驻面板**，分两种模式：
+AI The assistant is...**Right Bar Persistence Panel**，Two models:
 
-| 模式 | 用途 | 界面上有什么 |
+| Mode | Purpose | What's on the interface? |
 | --- | --- | --- |
-| **聊天**（默认） | 纯对话：只发你写的话，**不带任何笔记内容** | 一个输入框 + 「发送」，结果只带「复制」 |
-| **创作** | 处理笔记：分析 / 润色 / 续写 / 提问，结果能写回笔记 | 「分析对象」+ 任务标签，每条结果带四个写回操作 |
+| **Chat**（Default) | Pure conversation: Only words you write.**No notes.** | An input box + 「Send」，Only the results.「Copy」 |
+| **Create** | Processing notes: analysis / Polish / Continue writing / Question. I can write back my notes. | 「Analysis target」+ Task tab with four writebacks for each result |
 
-> 默认就是聊天模式，打开就能说话 —— 不需要先选什么东西。
-> 想看 AI 处理笔记、或把结果写进笔记，点上方「创作」。
-> 右键菜单里的 `AI 分析 / AI 润色 / AI 续写 / 问 AI` 会**自动切到创作模式**并选中对应任务。
+> Default is chat mode, open and talk -- there's no need to pick anything first.
+> Yeah. AI Handle notes, or put results in notes, point above「Create」。
+> From the right-key menu `AI Analyze / AI Polish / AI Continue writing / Question AI` **Automatically cut to creation mode**, and select the corresponding task.
 
-模型调用**全部由插件后端（Go 侧车）发起**，请求与密钥不经过插件前端，也不写入笔记目录。
+Model Call**All model calls originate in the Go plugin backend.**，The request and the key do not go through the frontend of the plugin and do not write to the notes directory.
 
-### 配置（两种方式，改哪儿都行）
+### Configure (both ways, anywhere)
 
-**方式一：在连接里配（初始值）** —— 编辑「AI.MD 笔记」连接 → 勾选 **启用 AI 功能** → 填写：
+**Mode I: Match in connection (initial value)** —— Edit「AI.MD Notes」Connection → Check **Enable AI Functions** → Fill out:
 
-| 字段 | 示例 | 说明 |
+| Fields | Example | Annotations |
 | --- | --- | --- |
-| AI 服务提供方 | `OpenAI 兼容` | 绝大多数国产模型与自建网关都兼容 OpenAI 协议 |
-| API 地址 | `https://api.deepseek.com/v1` | 服务根地址，不含 `/chat/completions`；Ollama 用 `http://127.0.0.1:11434/v1` |
-| 模型名称 | `deepseek-chat` | 按服务方文档填，如 `gpt-4o-mini`、`qwen2.5:7b` |
-| API 密钥 | `sk-…` | 存在 DBX 的密钥存储里，**只发给插件后端**；Ollama 本地模型可留空 |
-| 自定义人设 / 超时 / 上限 | — | 均可选（在弹框的「高级选项」里）：默认人设、60 秒超时、单次送入 12000 字符 |
+| AI Service provider | `OpenAI Compatibility` | Most of the national models are compatible with the self-built gateway. OpenAI Agreements |
+| API Address | `https://api.deepseek.com/v1` | Service root address, excluding `/chat/completions`；Ollama Use `http://127.0.0.1:11434/v1` |
+| Model Name | `deepseek-chat` | Fill in by service document, if `gpt-4o-mini`、`qwen2.5:7b` |
+| API Key | `sk-…` | Existence DBX The key is in storage.**Send plugin backend only**；Ollama Local models leave empty |
+| Custom Set / Timeout / Upper limit | — | All options (in frames)「Advanced Options」Lee: Default set,60 Second time out, one time in. 12000 Character |
 
-填完点 **「测试 AI 连接」**：它会用当前表单里的参数（**不必先保存**）发一次最小请求，直接在表单里回显
-「连接成功：deepseek-chat（openai）· 耗时 812 ms」或「鉴权失败（HTTP 401）：API 密钥无效」。
+Fill out points **「Test AI Connection」**：It uses the parameters in the current form.**You don't have to save it first.**）Sending a minimum request to appear directly in the form.
+「Connection success:deepseek-chat（openai）· Time-consuming 812 ms」or「DiscrepanciesHTTP 401）：API Key Invalid」。
 
-**方式二：在 AI 栏里改（更快，不用回去改连接）** —— 点 AI 栏右上角的 **⚙**，弹出的配置框里改完点「保存」即长期有效，
-点「测试连接」可以先试再存。弹框按钮吸在底部，内容再长也不会出现"找不到保存按钮"。三层优先级：
+**Mode 2: In AI Change in column (quick, no need to go back to connect)** —— Points AI Top right corner of the column **⚙**，Finish the popup configuration.「Save」It's a long term.
+Points「Test connection」You can try and save first. The dialog action bar stays fixed at the bottom and the content will never appear."Save button not found"。Three-tier priority:
 
 ```
-AI 栏里保存的（本机）  >  连接里的配置  >  内置默认值
+AI Saved in column (inline)  >  Configuration in Connection  >  Internal Default
 ```
 
-所以：**只用连接配的人什么都不用管**；在栏里改过的人会被标出「本机配置已覆盖连接配置」，
-点 **「清除本机配置」** 就能一键回到「以连接配置为准」。
+So:**You don't have to do anything with someone connected.**；Whoever changed it in the column will be marked.「This configuration already covers the connection configuration」，
+Points **「Clear local settings」** I'll get back to you.「Based on connection configuration」。
 
-> **密钥怎么存**：本机配置写在插件私有数据目录 `ai-config.json`（不在笔记目录里）。
-> 密钥**默认只在本次会话有效**；只有勾选 **「在本机记住密钥」** 后才会写进该文件（Unix 上权限 `0600`）。
-> 共享电脑上不建议勾选 —— 更好的做法是把密钥留在连接里（走 DBX 的密钥存储）。
+> **How do you save the key?**：This configuration is written in the plugin private data directory `ai-config.json`（Not in the notes directory.
+> Key**Default valid only for this session**；Just check. **「Remember key on this machine」** This document will not be included until later.Unix Permissions Up `0600`）。
+> The shared computer does not suggest ticking - better to leave the key in the connection (go) DBX . The key is stored.
 
-### 使用
+### Use
 
-- 入口：工具栏 **「AI 助手」**（或 `Ctrl/Cmd+I`）；右键菜单里的 `AI 分析 / AI 润色 / AI 续写 / 问 AI` 会直接切到创作模式并选中该任务。
-- **聊天模式（默认）**：写下想说的 → 点「发送」。请求里**不含任何笔记正文**，回答用于查看或复制。
-- **创作模式的四个任务**：**分析**（要点/待办/矛盾）、**润色**（保持原意与 Markdown 结构）、**续写**（末尾接着写）、**提问**（针对当前笔记答疑）。
+- Entry: Toolbar **「AI Assistant」**（or `Ctrl/Cmd+I`）；From the right-key menu `AI Analyze / AI Polish / AI Continue writing / Question AI` It cuts directly to the creation mode and selects the task.
+- **Chat mode (default)**：Write what you want to say. → Points「Send」。Please.**Without any note body**，The answer is for viewing or copying.
+- **Four jobs in creative mode**：**Analyze**（Key points/To-do/I'm sorry.**Polish**（Keep the point with Markdown Structure,**Continue writing**（I'll finish it.**Ask**（A question about the current note.
 
-**分析对象（只属于创作模式）** —— 面板上方一排按钮，随时可改，不会「开了就定死」：
+**Analyzing object (in creative mode only)** —— A line of buttons above the panel.「If you open it, you die.」：
 
-| 按钮 | 行为 |
+| button | Behaviour |
 | --- | --- |
-| `自动跟随`（默认） | 编辑器里**有选中就用选中**，否则用整篇笔记 |
-| `选中内容` | 固定只看当前选中的那一段（没选中会提示去划选） |
-| `整篇笔记` | 固定用当前笔记全文 |
-| `清除` | **不使用笔记正文**：只发你的问题/要求 |
+| `Auto-follow`（Default) | In the editor**Select if selected**，Or I'll take the whole note. |
+| `Selection` | Fixed the currently selected paragraph only (no hint to select) |
+| `Entire note` | Fixed Full Text of Current Notes |
+| `Clear` | **Do Not Use Note Body**：Just your questions./Request |
 
-- 对象区会显示 **对象类型 + 笔记名 + 字数**，并给你一段**内容预览**（前 160 字），发什么一目了然。
-- 划选、改内容、换笔记都会**实时刷新**对象；超过单次上限时会标注「发送时会自动截断」。
-- 状态行（右下角）同样会写「就绪 · 将发送选中内容（123 字）」，两边不会各说各话。
+- Object area will be displayed **Object Type + Note name + Number of words**，And I'll give you one.**Content Preview**（Front 160 What's going on?
+- Select, change, change notes.**Refresh in real time**objects;marks when a single cap is exceeded「It's automatically cut when it's sent.」。
+- Status line (lower right corner) also writes「Ready . The selection will be sent (123 Word)」，The two sides do not speak separately.
 
-**没有正文时（创作模式）**：`分析`/`润色` 仍然需要正文（状态行会说明并建议改用「提问」）；
-`提问`/`续写` 仍可用 —— 前者是纯对话，后者按你写的要求自由生成。纯聊天请直接切回「聊天」模式，更省事。
+**No text (creational mode)**：`Analyze`/`Polish` The text is still needed (state line will explain and recommend conversion)「Ask」）；
+`Ask`/`Continue writing` Still available -- the former is pure dialogue, the latter is created as you write. Please just cut back.「Chat」Mode, less.
 
-- 结果操作（**创作模式**下每条结果各有一组）：
-  - `插入到光标` —— 光标处插入，**不删除任何已有正文**（若有选区，会先确认，因为那等价于替换）
-  - `替换选中` —— **先弹确认框**（显示范围、行数变化与被替换内容预览）
-  - `追加到末尾`
-  - `复制`
-- 聊天模式的结果只有 `复制`（没有"要写回哪儿"这回事）。
-- 结果来自另一篇笔记时，写入前会再确认一次；写回后立即落盘。
-- 面板宽度、开合状态记在插件数据目录（`prefs.json`），**双击分隔条**复位默认宽度。
-- 面板**底部的输入/发送区固定不动**，上半区自己滚动 —— 窗口再矮、内容再长，按钮都不会被挤走。
+- Result Operations (Focus Operation)**Create mode**Each of the following results has a set:
+  - `Insert at cursor` —— The cursor is inserted,**Do not delete any existing body**（If there is an electoral district, it will be confirmed first, because the price is the replacement).
+  - `Replace selection` —— **Play the confirmation box first.**（Show range, row changes and previews of replacement)
+  - `Append to end`
+  - `Copy`
+- The result of chat mode is only `Copy`（Nothing."Where to write back?"That's it.
+- The result comes from another note, which is confirmed once more before writing; it is written back, and it goes down.
+- Panel width, coding status in plugin data directories ()`prefs.json`），**Double-click Separator**Reverts the default width.
+- Panel**Bottom input/Send area fixed**，The first half of the area rolls itself -- the windows are short, the content is long, the buttons are not squeezed away.
 
-### 隐私与安全
+### Privacy and security
 
-- **密钥不出后端**：走宿主给后端的生命周期通道下发（或本机配置），插件前端拿不到；不进日志，错误信息里会被脱敏成 `***`。
-- **默认最小范围**：只发送选中内容或当前笔记；发送前你可以先在编辑器里选中要处理的段落。
-- **出网说明**：请求由插件后端直接发往你填的 API 地址（所以不依赖 `host.network` 权限，也不受沙箱 CORS 限制）。
-  请只填写你信任的服务地址 —— 笔记正文会离开本机。
-- 断网 / 超时 / 鉴权失败都会给出可读中文提示，并记录在存储诊断日志里。
+- **Key No Backend**：Take the host to lower end of the life cycle channel (or in-house configuration), which is not available at the frontend of the plugin; if you do not log, the error message will be desensitized Done. `***`。
+- **Default Minimum**：Sends only the selected contents or the current notes; you can select the paragraphs to process in the editor before sending them.
+- **Networking description**：Request sent directly to you from the back of the plugin. API Address(s) `host.network` Permission, and no sandbox. CORS It's too late.
+  Please fill in the service address you trusted - the text of the note will leave the machine.
+- Disconnect / Timeout / The default gives a Chinese-readable hint and is recorded in the storage diagnostic log.
 
-### 为什么不接 DBX 内置 AI
+### Why not? DBX Internal AI
 
-宿主提供 `host.ai` 权限（`dbxPlugin.ai.openConversation`），但它**只负责开一个带数据快照的对话，
-不返回模型回复、不暴露模型配置** —— 做不了「AI 结果写回笔记」这件核心事。
-而权限声明是**静态**的，声明 `host.ai` 会把最低宿主抬到 0.6.20、并让更早的版本在**安装阶段直接拒绝整个包**。
-为一个用不上的入口把所有老用户挡在门外不值，所以本插件**刻意不依赖它**（打包脚本有闸门防止日后被加回来）。
-
----
-
-## 安装（使用 .dbxp）
-
-> 需要 **DBX ≥ 0.5.68**。插件只声明 `host.filesystem` 一个权限，AI 全部走自配模型/侧车直连，
-> 不依赖新宿主的 `host.ai` —— 所以老宿主也能装、能升级。
-
-1. 打开 DBX → 设置 → 插件；
-2. 安装 `dist/com.lwai.mdnotes-<版本>-windows-x64.dbxp`；
-   若提示签名相关错误，先在插件页开启**「允许安装未签名开发包」**（本地开发渠道）；
-3. 新建连接 → 连接类型选 **AI.MD 笔记**；
-4. 填写 **笔记存储目录**（有读写权限的绝对路径，可点右侧文件夹按钮选择）→ 测试连接；
-5. 打开连接即进入工作台。状态栏（右下角）应显示「已保存到存储目录：…」，点它可看存储状态详情。
+Hosted by `host.ai` Permission`dbxPlugin.ai.openConversation`），But it...**It's just a conversation with a data snapshot.
+Do not return model responses, do not expose model configuration** —— I can't.「AI And then I wrote back.」This core thing.
+And the statement of authority is...**Static**The declaration. `host.ai` It'll lift the lowest host. 0.6.20、And make an earlier version in**The whole package was directly rejected during the installation phase**。
+It's useless to keep all old users out of the door for a non-utilized entry, so this plugin**I don't want to depend on it.**（Packing of scripts with gates to prevent future additions).
 
 ---
 
-## 数据安全
+## Installation (Use .dbxp）
 
-插件的存储设计按「**一个目录可能被多个连接同时打开**」这个前提来做，三条硬规则：
+> **DBX ≥ 0.5.68**。Plugin Statement Only `host.filesystem` A mandate.AI AI uses user-configured models through direct sidecar requests,
+> Not dependent on the new host. `host.ai` —— So the old host can also fit and upgrade.
 
-- **删除只认显式指令**。保存采用「只删你显式删掉的东西」的语义：快照里没有的笔记会被**原样保留**，
-  不会因为「这个连接没打开过它」而被清掉。所以同一个存储目录可以安全地被多个连接/多窗口同时使用，互不覆盖、互不删除。
-- **删除进回收站**。删除笔记/文件夹时正文不会消失，而是移到 `<存储目录>/.mdnotes/trash/<时间戳>/`，可手动捞回。
-  极端情况下（文件被占用等）宁可留下孤儿文件，也不做不可逆的删除。
-- **读不到就不写回**。如果某篇笔记的正文文件读不到（被外部改名/移动/占用），界面会把它**冻结成只读**并提示，
-  绝不会把空内容写回去覆盖磁盘上的正文。
+1. Open DBX → Settings → Plugin;
+2. Install `dist/com.lwai.mdnotes-<Version>-windows-x64.dbxp`；
+   If a hint for signature-related errors is made, first on the plugin page**「Allow installation of unsigned development packages」**（Local development channels;
+3. New Connection → Connection Type Selection **AI.MD Notes**；
+4. Fill **Note Storage Directory**（Absolute path with read-and-write permission, selected by the right-hand folder button)→ Test connection;
+5. Opens the connection and enters the desk. The status bar (bottom right corner) should be displayed「Saved to storage directory:...」，Click it to see storage status details.
 
 ---
 
-## 存储模型
+## Data security
+
+Storage design for plugin by「**A directory may be opened with multiple connections**」Let's do this. Three hard rules:
+
+- **Remove Only Visibility Command**。Save with「Just what you obviously deleted.」Semantics: Notes not found in snapshots will be**Keep as it is.**，
+  It's not because「This connection never opened.」Cleared out. So the same memory directory can be safely connected to more than one./Multiple windows are used at the same time without covering or deleting each other.
+- **Remove to trash**。Remove Notes/The text of the folder will not disappear but will be moved to `<Storage Directory>/.mdnotes/trash/<timestamp>/`，It can be recovered manually.
+  In extreme cases (the document is occupied, etc.) it is preferable to leave the orphan document without irreversible deletion.
+- **If you can't read, you can't write it back.**。If you can't read the body of a note (renamed externally)/Move/The interface will take it.**Freeze into read-only**And hint,
+  Never write back empty content over the body of the disk.
+
+---
+
+## Storage Model
 
 ```
-<笔记存储目录>/
-├── 欢迎使用 MD 笔记.md        # 每篇笔记 = 一个真实 .md（文件名 = 标题）
-├── 工作/                      # 每个文件夹 = 一个真实子目录
-│   └── 重构验证.md
-└── .mdnotes/                  # 插件的元数据（不参与目录树显示）
-    ├── meta.json              # 结构索引：id / 标题 / 父子关系 / 路径 / 时间戳 + UI 状态（不含正文）
-    ├── trash/<时间戳>/         # 删除的正文（可捞回）
-    └── .write-probe           # 可写性探针
+<Note Storage Directory>/
+├── Welcome. MD Notes.md        # Every note. = A real one. .md（Filename = Title)
+├── Work/                      # Each Folder = A real subdirectories.
+│   └── Refactoring Verification.md
+└── .mdnotes/                  # Metadata for plugins (not participating in list tree display)
+    ├── meta.json              # Structure index:id / Title / parent relationship / Path / timestamp + UI Status (without text)
+    ├── trash/<timestamp>/         # Deleted body (recoverable)
+    └── .write-probe           # Writeable probe
 ```
 
-- **正文永远以 `.md` 为准**；`meta.json` 只记结构，丢了也能靠文件名+目录重建。
-- 写盘一律「临时文件 + `rename`」原子替换；临时文件名带 `pid` 与序号，避免多实例互相覆盖。
-- 保存时按内容 SHA-256 缓存判断「是否真的变了」，只重写有变化的笔记。
+- **The text will always be `.md` Reference**；`meta.json` Just remember the structure. First Name+Directory reconstruction.
+- It's all right.「Temporary documents + `rename`」atom replacement;temporary filename belts `pid` avoids multiple cases overlaying with serial numbers.
+- When saving by content SHA-256 Cache judgement「Has it really changed?」，Only rewrite changed notes.
 
-### 为什么正文不放在索引里
+### Why isn't it in the index?
 
-单体 `notes.json` 在数据量大时读写与损坏的风险都高；拆成真实文件后每条笔记独立、可外部编辑、可 diff、可被其它工具消费。
+Single `notes.json` There is a high risk of reading, writing and damage when the amount of data is large; each note is independent, externally editable and capable of being broken into a true document diff、It can be consumed by other tools.
 
 ---
 
-## 构建
+## Build
 
-需要 **Node 22+** 与 **Go 1.20+**（官方 Go SDK 已 vendor 进 `backend/dbxsdk`，**无需联网即可构建**）。
+**Node 22+** with **Go 1.20+**（Official Go SDK Already vendor In `backend/dbxsdk`，**Build without a network**）。
 
-### 推荐：用仓库自带脚本（内建自检 + 精确 checksums）
+### Recommended: Use the warehouse to bring its own script (inline self-check) + Exact checksums）
 
 ```bash
-# 1) 编译侧车
-GOROOT=<go 根> <go> build -C backend -o dbx-plugin-mdnotes.exe .
+# 1) Compile side vehicle
+GOROOT=<go Root> <go> build -C backend -o dbx-plugin-mdnotes.exe .
 
-# 2) 打包（会先跑静态自检，再生成 .dbxp 与同名 artifact.json）
+# 2) Packing (e.g. run static self-inspection, then generate) .dbxp Same name artifact.json）
 node _buildpkg.js
 # → dist/com.lwai.mdnotes-0.7.1-windows-x64.dbxp
 ```
 
-`_buildpkg.js` 会：把 `manifest.entrypoints.backend.executable` 重写为包内真实路径
-（`bin/<target>/dbx-plugin-mdnotes[.exe]`，**只有 windows 目标带 `.exe`**）、生成**精确覆盖每个文件**的 `checksums.json`、
-跳过 `_` 前缀文件，并给包内条目写上 **Unix 权限位**。
+`_buildpkg.js` Yes: yes `manifest.entrypoints.backend.executable` Rewrite as the true path in the package
+（`bin/<target>/dbx-plugin-mdnotes[.exe]`，**Only  windows target has `.exe`**）、Generate**Overwrite each file accurately**`checksums.json`、
+Skip `_` Prefix file and write to the entry in the package Move! **Unix Permission position**。
 
-> **为什么必须写权限位**：宿主安装器在 macOS/Linux 上会按 zip 条目的 unix mode 调 `set_permissions`；
-> 而 zip 读取库在 `external_attributes == 0`（或「制作系统」不是 Unix）时**返回 None**，宿主就会跳过设权限 ——
-> 解出来的侧车是 `0644`、**没有可执行位，根本起不来**。官方打包器给 `bin/<target>/` 下的文件 `0755`、其余 `0644`，
-> 本仓库的打包脚本照做，`_verify.mjs` 也加了对应断言。
+> **Why do you have to write permissions?**：The host installer is in macOS/Linux I'll press it. zip Purpose unix mode Transfer `set_permissions`；
+> And... zip Read Library In `external_attributes == 0`（or「Production system」Nope. Unix）Time**Back None**，Host will skip permissions--
+> The sidecar that was pulled out was... `0644`、**There's no place to enforce it.**。The official packer. `bin/<target>/` Below `0755`、Other `0644`，
+> This warehouse is packed with scripts.`_verify.mjs` The corresponding assertion has also been added.
 
-> 也可以走官方 CLI（`npm install -g @dbx-app/plugin-cli` 后 `dbx-plugin dev` / `dbx-plugin package`），
-> 其行为等价。注意 `dbx-plugin.toml` 的 `[package].include` **不要**包含 `bin/` —— 二进制由打包器注入。
+> Or go to the official. CLI（`npm install -g @dbx-app/plugin-cli` Back `dbx-plugin dev` / `dbx-plugin package`），
+> Their behavior is equivalent. Attention. `dbx-plugin.toml` `[package].include` **Don't.**configuration `bin/` —— Binary is injected by a packer.
 
-### 一次产出全部平台（含 `release-candidates.json`）
+### Full platform with one output `release-candidates.json`）
 
-官方 CLI **只按当前宿主平台打包**，显式指定别的 `--target` 会被拒绝
+Official CLI **Pack only the current host platform**，configuration `--target` They'll be rejected.
 （`Native plugin target 'X' does not match build host 'Y'; run this package command on the target platform`）；
-官方文档给的多平台做法是在 CI 上开平台矩阵、各自构建，再合并出 `release-candidates.json`。
+The official document's multi-platform approach is CI Open the platform matrix, build each and merge it. `release-candidates.json`。
 
-本插件的侧车是**纯 Go、无 cgo**，可以直接交叉编译，因此本地一条命令就能出全套：
+The side of this plugin is...**Pure Go、none cgo**，It can be compiled directly and cross-compiled, so a local command can come out in full:
 
 ```bash
-node _release.mjs                       # 默认 windows-x64 + darwin-arm64 + linux-x64
-node _release.mjs windows-x64 linux-x64 # 也可以只做指定平台
+node _release.mjs                       # Default windows-x64 + darwin-arm64 + linux-x64
+node _release.mjs windows-x64 linux-x64 # Or you can just make a specific platform.
 ```
 
-它依次做四件事：交叉编译侧车（`CGO_ENABLED=0 GOOS/GOARCH=...`，产物落在 `_xbuild/`）→ 逐平台打包
-→ 逐包校验（`_verify.mjs`）→ 汇总出：
+It does four things in turn: cross-compile sidecar.`CGO_ENABLED=0 GOOS/GOARCH=...`，It's coming. `_xbuild/`）→ Packing by Platform
+→ Check-in-approach`_verify.mjs`）→ Summary:
 
 ```
-dist/<id>-<version>-<target>.dbxp            未签名候选包（上传到 Release / CDN / 对象存储）
-dist/<id>-<version>-<target>.artifact.json   该包的 target / url / sha256 / size
-dist/release-candidates.json                 plugin 元信息 + 全部平台 artifacts（dbx-store 同步用）
+dist/<id>-<version>-<target>.dbxp            Unsigned candidate package (upload to Release / CDN / Object Storage)
+dist/<id>-<version>-<target>.artifact.json   The bag. target / url / sha256 / size
+dist/release-candidates.json                 plugin MetaInfo + All platforms artifacts（dbx-store Synchronise)
 ```
 
-> **`release-candidates.json` 里的 `sha256` 绑定确切字节**：改完代码重新构建后必须重新生成它，
-> 并上传**同一批** `.dbxp`。官方发布后的资产不允许覆盖，任何字节变化都要递增版本号重新走审核。
+> **`release-candidates.json` Lee. `sha256` Bind exact bytes**：It has to be regenerated when the code has been rebuilt.
+> & Upload**Same one.** `.dbxp`。Assets after official issuance are not allowed to be covered and any byte changes are subject to an incremental review of the version numbers.
 
-> **不要手动设置 `GOROOT` 指向错目录**。Go 1.21+ 会自行定位；若升级 Go 后旧目录还在、环境变量没跟着改，
-> 会出现 `package encoding/json is not in std` 这类全线报错 —— 见[排障](#排障)。
+> **Do Not Manual Settings `GOROOT` Pointing to the wrong directory**。Go 1.21+ Positioning; if upgraded Go The old directories are still there and the environment variables are not changed.
+> It's coming. `package encoding/json is not in std` This whole line is wrong - see[The barrier.](#The barrier.)。
 
 ---
 
-## 目录结构
+## Contents structure
 
 ```
 dbx-md-notes/
-├── manifest.json          # id / publisher / version、entrypoints、连接类型字段、本地化
+├── manifest.json          # id / publisher / version、entrypoints、Connect type fields, localize
 ├── dbx-plugin.toml        # [backend] language/directory/binary + [package] include
 ├── assets/plugin.svg
-├── ui/                    # 前端（跑在沙箱 iframe 里，无磁盘/网络权限）
+├── ui/                    # Frontend iframe There's no disk./Network Permissions)
 │   ├── index.html
 │   ├── styles.css
-│   ├── app.js             # 目录树（指针拖拽）、编辑器/预览、搜索、表联动、导出/备份/恢复
-│   ├── markdown.js        # Markdown 渲染（无依赖）
-│   ├── sql-highlight.js   # SQL 语法高亮
-│   └── storage.js         # 存储层：唯一落盘通道 = 侧车；绝不静默退化
+│   ├── app.js             # Directory tree (trawling pointer), editor/Preview, search, watch contact, export/Backup/Restore
+│   ├── markdown.js        # Markdown Render (no dependence)
+│   ├── sql-highlight.js   # SQL Syntax Highlight
+│   └── storage.js         # Storage layer: the only persistence path = Sidecar; never silently degraded
 ├── backend/
-│   ├── go.mod             # module github.com/lwai/mdnotes（零外部依赖）
-│   ├── main.go            # 侧车：笔记文件读写、索引、导出/备份/恢复、mdnotes:// 文件系统
-│   ├── main_test.go       # 单测：重命名/移动、备份恢复往返、路径穿越拒绝、数据安全回归
-│   └── dbxsdk/            # 官方 Go SDK 原样 vendor（见 dbxsdk/VENDOR.md）
-├── dist/                  # 打包产物 *.dbxp / *.artifact.json / release-candidates.json（不进版本控制）
-├── _xbuild/               # 交叉编译出的 darwin/linux 侧车（不进版本控制）
-└── _*.{js,mjs,py}         # 验证与发布工具链（`_` 前缀，不进包）
+│   ├── go.mod             # module github.com/lwai/mdnotes（Zero external dependence)
+│   ├── main.go            # Side vehicles: notes for reading and writing, indexing, export/Backup/Recovery,mdnotes:// File System
+│   ├── main_test.go       # Single measure: Rename/Movement, backup back-to-back, route crossing denial, data secure return
+│   └── dbxsdk/            # Official Go SDK As it is. vendor（See dbxsdk/VENDOR.md）
+├── dist/                  # Pack the product. *.dbxp / *.artifact.json / release-candidates.json（No Version Control)
+├── _xbuild/               # Cross-compiled darwin/linux Side vehicle (no version control)
+└── _*.{js,mjs,py}         # Validate and Publish Tool Chains`_` Prefix, not package)
 ```
 
-### 为什么 vendor 官方 SDK
+### Why? vendor Official SDK
 
-`github.com/t8y2/dbx/plugins/sdk/go/dbx-plugin-sdk` **没有发布到 Go 模块代理**（`go get` 报 `unknown revision`），
-且其 `go.mod` 声明 `go 1.22`，独立引入会让低版本工具链无法构建。
-因此把官方 `sdk.go` **逐字节**复制为 `backend/dbxsdk` 包，与本模块一起编译：只需 Go 1.20+，离线可构建。
+`github.com/t8y2/dbx/plugins/sdk/go/dbx-plugin-sdk` **Not published Go Module Proxy**（`go get` Report `unknown revision`），
+And... `go.mod` Statement `go 1.22`，The introduction of independence will make the low-end tool chain impossible to build.
+That's why the official `sdk.go` **Bytes**Copy As `backend/dbxsdk` Package, compiled with this module: just Go 1.20+，Offline to build.
 
-SDK 负责三件容易写错的事：`plugin/initialize` 必须返回 `{protocolVersion, capabilities, plugin:{id,version}}`
-（**id/version 必须与 manifest 完全一致，否则宿主直接丢弃侧车**）、每请求一个 goroutine、8MB 行缓冲。
+SDK I'm in charge of three simple things:`plugin/initialize` Must return. `{protocolVersion, capabilities, plugin:{id,version}}`
+（**id/version must match manifest It's exactly the same, or the host throws away the sidecar.**）、Every request goroutine、8MB Line buffer.
 
 ---
 
-## 验证工具链
+## Authentication tool chain
 
-改前端或打包相关代码后，**按顺序跑完这几层**：
+After changing the front-end or packing the relevant code,**Run these floors in order.**：
 
 ```bash
-NODE=<node 可执行文件>
+NODE=<node Executable>
 
-"$NODE" _e2e_bridge.mjs   # 1) 桥接级：官方 SDK 源串在 vm 里跑 + 模拟宿主 dispatch + 真实 storage.js + 真实侧车
-"$NODE" _e2e_ui.mjs       # 2) UI 级：真实 index.html 灌进 jsdom + 真实侧车（需 jsdom）
-"$NODE" _e2e_layout.mjs   # 3) 布局级：真实 Chrome 渲染，量「按钮在不在用户看得见的区域里」（需 Chrome + puppeteer-core）
-$PYTHON _domcheck.py      # 4) 静态：DOM 引用悬空、重复函数声明、关键元素缺失
-"$NODE" _buildpkg.js && "$NODE" _verify.mjs   # 5) 打包（内建自检）+ 产物结构 / sha256 / 权限位校验
+"$NODE" _e2e_bridge.mjs   # 1) Bridge: Official SDK Source Thread in vm Run! + Simulate host dispatch + Real storage.js + Real sidecar.
+"$NODE" _e2e_ui.mjs       # 2) UI Level: Real index.html In. jsdom + Real side vehicles (needs) jsdom）
+"$NODE" _e2e_layout.mjs   # 3) Layout level: Real Chrome Render, measure「Buttons in areas not visible to users」（Yes Chrome + puppeteer-core）
+$PYTHON _domcheck.py      # 4) Static:DOM References to suspension, duplicate function statements, missing key elements
+"$NODE" _buildpkg.js && "$NODE" _verify.mjs   # 5) Packing (inline self-checking)+ Product Structure / sha256 / Permissions Validation
 ```
 
-要一次出全平台候选包与 `release-candidates.json`，直接跑 `_release.mjs`（它内部会调用上面第 5 步）。
+We're going to have a full platform. `release-candidates.json`，Just run. `_release.mjs`（It's going to call up first. 5 Step.
 
-各层能抓住什么：
+What can be caught on every level:
 
-- **`_e2e_bridge.mjs`** —— 桥接语义错用、侧车握手失败、导出/备份/恢复往返、**数据安全语义**（未知≠要删、显式删除进回收站、缺正文不写回）。
-- **`_e2e_ui.mjs`** —— **唯一能抓住「界面启动即死」的一层**：一个缺失元素就能让所有按钮失效。也覆盖拖拽落盘、删除必须带 `deletedIds`。
-- **`_e2e_layout.mjs`** —— **唯一能抓住「元素存在但用户看不见」的一层**（jsdom 没有布局引擎，`getBoundingClientRect` 全是 0）。
-  实测过的事故：AI 栏配置区一展开，底部的输入 + 发送按钮被推出视口 —— 元素在、JS 没报错，前两层都抓不到。
-  现在它会在多种视口高度 / 多种面板状态下量几何，并跑一遍「没有分析对象也能聊天」的真实点击流程。
-  环境里没有 Chrome / `puppeteer-core` 时自动 SKIP。
-- **`_domcheck.py`** —— `$("id").属性` 直接取值（元素缺失会抛 TypeError 连坐整页）、同层重复函数声明（后者静默覆盖前者）、关键元素齐备。
-- **`_buildpkg.js` / `_verify.mjs`** —— 打包前几道闸门 + 包结构、`checksums.json` 精确覆盖、sha256 全匹配、关键代码标记、**把包内二进制真跑一次**发探针 RPC。
+- **`_e2e_bridge.mjs`** —— The synonyms of the bridge are wrong, the sidecar's handshake failed, and it's exported./Backup/Back and forth.**Data security syntax**（Unknown≠To delete, explicitly delete into the trash and leave the body unwritten.
+- **`_e2e_ui.mjs`** —— **The only thing I can catch.「Interface Launched and Dead」First floor**：A missing element can disable all buttons. Also overwhelm drag-down discs, delete must And... `deletedIds`。
+- **`_e2e_layout.mjs`** —— **The only thing I can catch.「Element exists but the user cannot see」First floor**（jsdom No layout engine.`getBoundingClientRect` All of them. 0）。
+  Accidents measured:AI Column Configuration 1 Expand, Bottom Input + The sending button is pushed out of the window - the element is in,JS I'm not wrong. I can't catch the first two floors.
+  Now it's got multiple vision heights. / Multiple panels down geometry and run.「You can talk without an analyzer.」Real click process.
+  Not in the environment. Chrome / `puppeteer-core` Auto SKIP。
+- **`_domcheck.py`** —— `$("id").Properties` Direct take value (elemental loss throws) TypeError The whole page, the same layer of duplicate function statements (the latter silently covers the former), and the availability of key elements.
+- **`_buildpkg.js` / `_verify.mjs`** —— Pack the first few gates. + Package structure,`checksums.json` Exact coverage,sha256 All matches, key code tags,**Run the binary in the bag once.**Sent a probe. RPC。
 
-> **只测后端测不出桥接 bug，只测桥接测不出「界面根本没启动」，jsdom 又测不出「布局把元素挤没了」。**
-> 依赖：`jsdom` 与 `puppeteer-core` 装在隔离工作区（`DBX_NODE_WS` 指向其 `package.json`），Chrome/Edge 用系统安装。
-> 三个脚本共用 `_testutil.mjs`（删临时目录、起子进程的封装）。
+> **Only the backend can't detect the bridge. bug，It's just a bridge.「The interface didn't even start.」，jsdom I don't know.「The layout has squeezed out the elements.」。**
+> Dependency:`jsdom` with `puppeteer-core` Loaded in an isolated work area (IWP)`DBX_NODE_WS` Point to him. `package.json`），Chrome/Edge Installed with systems.
+> Three scripts share `_testutil.mjs`（Delete the temporary directory, the encapsulation of the starter process.
 
 ---
 
 ## Sidecar RPC
 
-| 方法 | 说明 |
+| Methodology | Annotations |
 | --- | --- |
-| `plugin/initialize` | 由 SDK 处理，完成协议版本与身份校验 |
-| `connection/test` | 校验存储目录可写，返回将写入的路径 |
-| `connection/connect` / `disconnect` | 连接生命周期；`connect` 会从连接配置里吸收 `storage_dir` |
-| `notes/ping` | 前端握手探测；报的版本**运行时读包内 manifest**（不用编译期常量，避免发版漂移） |
-| `notes/probe` | 非破坏性可写性探测（只写 `.mdnotes/.write-probe`） |
-| `notes/load` | 返回 `{data, path, dir, pending}`。**`data` 是外壳，笔记在 `data.nodes`**；正文读不到时该节点带 `contentMissing:true` 且**不含** `content` |
-| `notes/save` | 写正文（未变则按 SHA-256 跳过）+ 原子替换索引。**只删 `deletedIds` 显式点名的节点**，其余不在快照里的节点原样保留；删除进回收站 |
-| `notes/exportNote` | 导出单篇。默认返回 `{fileName, dataBase64}`（交宿主「另存为」）；`toDisk:true` 才写进存储目录 |
-| `notes/backup` | 备份为 zip（正文 + `mdnotes-backup.json` + `.mdnotes/meta.json`）。默认返回字节 |
-| `notes/restore` | 从备份 zip 恢复（`dryRun` 只回报）。拒绝路径穿越与非本插件备份；恢复前自动存 `pre-restore-*.zip` 快照 |
-| `notes/setDir` / `notes/path` | 手动指定 / 查询存储目录 |
-| `ai/config` | 当前生效的 AI 配置与来源（**不含密钥**，只有 `hasKey` / `keyFrom` / `overridden` / `missing`） |
-| `ai/setConfig` | 由 AI 栏更新配置（`persist:false` 只改内存）。密钥默认不落盘，勾选「记住密钥」才写 `ai-config.json` |
-| `ai/resetConfig` | 清除本机（AI 栏）保存的配置，回到「以连接配置为准」 |
-| `ai/test` | 用给定参数（或当前配置）发一次最小请求，**不修改生效配置** |
-| `ai/chat` | `{task, text, instruction}` → `{content, model, usage, truncated, sentChars, latencyMs}`；由侧车直连模型 |
-| `ui/getPrefs` / `ui/setPrefs` | 界面偏好（面板宽度、AI 栏开合），存 `<插件数据目录>/prefs.json`；键白名单 + 数值钳制 |
-| `connection/action` | 连接表单自定义动作。目前只有 `test-ai`（用**未保存的表单值**发一次最小请求） |
-| `filesystem/list\|read\|write\|createDirectory\|delete\|rename` | 把笔记树投影成 `mdnotes://` 虚拟文件系统 |
-| `contextMenu/com.lwai.mdnotes.newNoteForTable` | 记录表上下文到 `pending`，供「为表新建笔记」取用 |
+| `plugin/initialize` | By SDK Processing, protocol version and ID verification completed |
+| `connection/test` | Verify memory directory to write, return path to be written |
+| `connection/connect` / `disconnect` | Connecting life cycle;`connect` It'll be absorbed from the connection configuration. `storage_dir` |
+| `notes/ping` | Front-end handshake detection; paper version**In Run-time Read Package manifest**（We don't have to compile a constant, we don't have to float. |
+| `notes/probe` | Non-destructive writeability detection (written only) `.mdnotes/.write-probe`） |
+| `notes/load` | Back `{data, path, dir, pending}`。**`data` It's the shell. The notes. `data.nodes`**；Nodes have when text cannot be read `contentMissing:true` and**does not contain** `content` |
+| `notes/save` | Write body (unchanged by) SHA-256 Skip+ Atomic Replace Index.**Delete only `deletedIds` Visible nodes**，Keep the remaining nodes which are not in the snapshot as they are; delete into the trash |
+| `notes/exportNote` | Export a single section. Default Return `{fileName, dataBase64}`（The host.「Save As」）；`toDisk:true` Just write in the memory directory |
+| `notes/backup` | Backup As zip（note body + `mdnotes-backup.json` + `.mdnotes/meta.json`）。Default Bytes Return |
+| `notes/restore` | From Backup zip Restore`dryRun` Only in return. Reject path-crossing and non-notes plugin backup; automatic storage before recovery `pre-restore-*.zip` Photo |
+| `notes/setDir` / `notes/path` | Manually Assign / Query Storage Directory |
+| `ai/config` | in force AI Configure & Source**Without Keys**，Only  `hasKey` / `keyFrom` / `overridden` / `missing`） |
+| `ai/setConfig` | By AI Bar Update Configuration (`persist:false` Only memory changes. Key default, tick「Remember key」Just write it. `ai-config.json` |
+| `ai/resetConfig` | Clear this machineAI Bar) Saves the configuration, go back「Based on connection configuration」 |
+| `ai/test` | Sending a minimum request with given parameters (or current configuration)**Do not change effective configuration** |
+| `ai/chat` | `{task, text, instruction}` → `{content, model, usage, truncated, sentChars, latencyMs}`；It's a sidecar calls the model directly. |
+| `ui/getPrefs` / `ui/setPrefs` | Interface preferences (panel width and AI Bar opening) `<Plugin Data Directory>/prefs.json`；White List + Numeric clamp |
+| `connection/action` | Connects a form to customize actions. Only for now. `test-ai`（Use**Unsaved Form Values**(A minimum request) |
+| `filesystem/list\|read\|write\|createDirectory\|delete\|rename` | Project the notes tree. `mdnotes://` Virtual File System |
+| `contextMenu/com.lwai.mdnotes.newNoteForTable` | Context on Log to `pending`，For「New note for table」Access |
 
-> 侧车会**递归扫描**入参里的 `storage_dir / storageDir / storage_path / notes_dir …`，
-> 不依赖宿主把配置塞在某个固定字段路径上。
+> The sidecar will.**Recursive Scan**In the box. `storage_dir / storageDir / storage_path / notes_dir …`，
+> Do not rely on the host to plug the configuration into a fixed field path.
 
-**AI 配置的两层与取值顺序**（`backend/ai.go`）：
+**AI Configure the two layers and the order in which the values are taken**（`backend/ai.go`）：
 
 ```
-aiConn  ← connection/connect|action 带来的 ai_* 与 connection_secrets.ai_api_key（易失，每次 connect 前清空）
-aiLocal ← AI 栏「保存」写入（持久化到 <插件数据目录>/ai-config.json）
-生效值 = 默认值 → aiConn 逐字段覆盖 → aiLocal 逐字段覆盖非空值
+aiConn  ← connection/connect|action Bring it in. ai_* with connection_secrets.ai_api_key（Easy to lose, every time. connect Clear ahead)
+aiLocal ← AI Column「Save」Writing (extended to <Plugin Data Directory>/ai-config.json）
+Valid value = Default value → aiConn Field overwrite → aiLocal Field by Field Overwrite Non Empty Value
 ```
 
-`ui/setPrefs` 会被调用两次（读盘后归一化一次、合并写入前再一次），所以数值解析必须同时认
-`float64`（JSON 解出）与 `int`（已归一化）—— 只认 `float64` 会把第二次的键当坏值丢掉，静默丢配置。
+`ui/setPrefs` They are called twice (one after reading, one before merging), so the numeric resolution must be recognized at the same time.
+`float64`（JSON Other Organiser `int`（Reunified) - Only `float64` The second key will be thrown off the bad value, silently.
 
 ---
 
-## 排障
+## The barrier.
 
-状态栏 → 点开「存储状态」，按下列几行定位：
+Status Bar → Light it up.「Storage status」，The following lines shall be used:
 
-| 现象 | 原因与处理 |
+| phenomena | Reasons and treatment |
 | --- | --- |
-| 侧车进程：**未提供 invoke 桥接** | 前端没运行在 DBX 宿主里（例如直接用浏览器打开 `ui/index.html`）。属预期行为。 |
-| 侧车进程：**Method not found: notes/ping** | `invoke` 通了但侧车没认出来 → 多为 `manifest.json` 的 `entrypoints.backend.executable` 与实际二进制名不一致，或 `dbx-plugin.toml` 缺 `[backend]` 导致后端从未被编译。 |
-| 实际落盘目录：**（未读到）** | 宿主没把连接配置传进前端上下文。侧车仍会在 `connection/connect` 时自行吸收目录，**不影响保存**，只是 UI 显示不出来。 |
-| 保存失败 + 权限类错误 | 存储目录不可写/不存在。换一个当前用户有权写入的目录。 |
-| 笔记显示为**只读并提示「正文文件读不到」** | 该 `.md` 被外部改名/移动/占用。恢复文件本身即可；插件不会用空内容覆盖它。 |
-| **AI 尚未配置完整（还缺：…）** | AI 栏顶部会直接列出缺哪几项，点 ⚙ 展开配置区填写；也可回到连接设置里填。 |
-| **鉴权失败（HTTP 401）** | 密钥错误或没有该模型的权限。用配置区的「测试连接」直接复验（不必先保存）。 |
-| **找不到接口（HTTP 404）** | API 地址通常要带版本路径，如 `https://api.deepseek.com/v1`（插件会自动补 `/chat/completions`）。 |
-| **AI 请求超时** | 慢模型把「单次超时」调到 120–300 秒。 |
-| **改了连接里的 AI 配置但没生效** | AI 栏里保存过本机配置（它优先于连接）。点配置区的「清除本机配置」即可回到连接配置。 |
-| **「发送」按钮是灰的** | 状态行会直接说明是哪一种：配置没填齐（「还缺：…」，点 ⚙ 配置）、聊天模式没写内容、或创作模式下该任务需要正文而对象为空。 |
-| **找不到改模型参数的地方** | 在 AI 栏右上角 **⚙**，配置是一个独立弹框（不占聊天区）。 |
-| **按钮/输入框看不见了** | 面板底栏是固定的、上半区自己滚动；弹框的按钮行是吸底的。若仍异常，把 AI 栏拖宽或收起配置弹框，并请反馈（有专门的布局回归检查 `_e2e_layout.mjs` 覆盖这类问题）。 |
-| **发出去的和我以为的不一样** | 聊天模式**不带笔记内容**；创作模式看对象区的摘要与预览（`自动跟随` 会跟着编辑器变，想固定就点 `整篇笔记` / `选中内容`，点 `清除` 则一个字都不发）。 |
-| **AI 栏拖不宽 / 拖了没反应** | 每栏有最小宽度（目录 180px、AI 280px）与上限 720px；双击分隔条复位。 |
-| 想找回删掉的笔记 | 看 `<存储目录>/.mdnotes/trash/<时间戳>/`。 |
-| Go 报 `package encoding/json is not in std` | `GOROOT` 指向了旧的 Go 目录。清掉 `GOROOT` 或指向当前安装。 |
+| Side-car process:**Not provided invoke Bridge.** | The frontend is not running DBX Host (e.g. by direct browser) `ui/index.html`）。Anticipatory behaviour. |
+| Side-car process:**Method not found: notes/ping** | `invoke` succeeded, but the sidecar didn't recognize it. → Mostly. `manifest.json` `entrypoints.backend.executable` inconsistent with the actual binary name, or `dbx-plugin.toml` Missing `[backend]` As a result, the backend was never compiled. |
+| Actual storage directory:**（Not available)** | The host does not transfer the connection configuration to the front-end context. The sidecar will still be there. `connection/connect` It's a loads the configured directory.**Without prejudice to saving**，Only  UI Show it not out. |
+| Save Failed + Permission class error | Store directory is not written/Doesn't exist. Change the directory that the current user is entitled to write to. |
+| Notes displayed as**Read and hint only「Note body file cannot be read」** | The `.md` Renamed externally/Move/Occupancy. Restore the document itself is sufficient; the plugin will not cover it with empty content. |
+| **AI Not fully configured (deficit: ...)** | AI At the top of the column, you'll list the missing points. ⚙ Expands the configuration area to fill in; you can also return to the connection settings to fill in. |
+| **DiscrepanciesHTTP 401）** | The key is wrong or does not have permission for the model. Use Configuration「Test connection」Direct check (does not have to save first). |
+| **No interface found (HTTP 404）** | API The address usually needs a version of the path, for example `https://api.deepseek.com/v1`（Plugin will be added automatically `/chat/completions`）。 |
+| **AI Request timeout** | Slow model.「Single timeout」Redeployment 120–300 sec. |
+| **Changed the connection. AI Configure but not effective** | AI bar. Point Configuration「Clear local settings」can return to the connection configuration. |
+| **「Send」Buttons are gray.** | The status line directly indicates which type: configuration not filled (「Still missing:...」，Points ⚙ Configure, chat mode does not write, or creation mode requires text and objects are empty. |
+| **No modeling arguments found** | AI Top right corner of the column **⚙**，The configuration is a stand-alone box (no chat area). |
+| **button/I can't see the input frame.** | The floor bar of the panel is fixed, with the first half rolling by itself; the button line of the dialog frame is inhaled. If it's still unusual, AI Bars drag wide or close configuration frames, and please provide feedback (with specific layout back check) `_e2e_layout.mjs` To cover such issues). |
+| **It's not what I thought it was.** | Chat mode**without note content**；The creation mode looks at the summary and preview of the object area.`Auto-follow` It changes with the editor. `Entire note` / `Selection`，Points `Clear` It's not even a word. |
+| **AI Can not open message / It didn't work.** | Minimum width for each column (table of contents) 180px、AI 280px）with ceiling 720px；Double-click the split bar to double-click. |
+| Trying to get the deleted notes back. | Look. `<Storage Directory>/.mdnotes/trash/<timestamp>/`。 |
+| Go Report `package encoding/json is not in std` | `GOROOT` It points to the old one. Go Contents. Clear it. `GOROOT` or points to the current installation. |
 
 ---
 
-## 已知边界
+## Known Borders
 
-- **要求 DBX ≥ 0.5.68**。插件只声明 `host.filesystem`；**刻意不依赖** `host.ai`（理由见
-  [为什么不接 DBX 内置 AI](#为什么不接-dbx-内置-ai)），所以升级插件不需要先升级 DBX。
-- UI 完全运行在沙箱里，**没有磁盘与网络权限**：所有落盘都经侧车，导出/备份必须借宿主的原生「另存为」。
-- AI 请求由**侧车**发出（不走前端），因此不需要 `host.network` 权限，也不受沙箱 CORS 限制。
-- 连接参数（含 `storage_dir`）有 **2 MiB 上限**；从备份恢复时超过约 1.5 MB 的 zip 会被拒绝并提示手动解压。
-- 同一目录被多个连接同时编辑时采用**后写覆盖**（last-write-wins），不做实时合并。
-- **AI 栏的对话是单轮的**：每次只发送「你的消息（聊天）」或「分析对象 + 你的额外要求（创作）」，不把上一轮回复回灌给模型。
-- **聊天模式不带笔记正文**；创作模式的分析对象只覆盖当前笔记（选中一段 / 整篇 / 什么都不带），不会自动发送整个笔记库。
-- **「提问」「续写」在创作模式下没有正文时也可单独使用**（纯对话 / 自由生成），但「分析」「润色」必须有正文。
-- **AI 栏的模式不持久**：每次打开回到默认的「聊天」；面板宽度与开合状态才记在 `prefs.json`。
-- **面板宽度与开合状态、以及「分析对象」的来源选择都是本机/本会话状态**：宽度与开合记在 `prefs.json`（多连接共用），
-  对象来源存在内存里（重开工作台回到默认的「自动跟随」）。
-- 多个连接共用同一存储目录时，**AI 配置按连接各自独立**（连接密钥只在各自侧车进程的内存里）；
-  在 AI 栏里保存的「本机配置」则是**全机共用**的。
+- **Request DBX ≥ 0.5.68**。Plugin Statement Only `host.filesystem`；**I don't rely on it.** `host.ai`（For a reason.
+  [Why not? DBX Internal AI](#Why not?-dbx-Internal-ai)），So the upgrade plugin doesn't need to be upgraded first. DBX。
+- UI Full running in the sandbox.**No Disk and Network Permissions**：All writes go through the sidecar./Backup must be made by the host.「Save As」。
+- AI Request by**Sidecar**Send (no frontend) not required `host.network` Permission, and no sandbox. CORS Limit.
+- Connect Parameters `storage_dir`）Yeah. **2 MiB Upper limit**；More than agreed to restore from backup 1.5 MB zip You will be rejected and you will be prompted to decompress manually.
+- Use of the same directory for multiple connections and simultaneous editing**Post Overwrite**（last-write-wins），Do not do real-time consolidation.
+- **AI It's a one-way conversation.**：Only sent each time「Your message.」or「Analysis target + Your extra requirements.」，Do not pour the last round back to the model.
+- **Chat mode without text**；Only current notes are covered by the analysis object of the creation mode (select a paragraph) / Whole / Nothing.
+- **「Ask」「Continue writing」It can also be used alone when there is no text in creative mode.**（Pure conversation / Free generation) but「Analyze」「Polish」There must be text.
+- **AI Column mode does not last**：Every time open back to default「Chat」；Panel width and openness is recorded in `prefs.json`。
+- **Panel width and open state, and「Analysis target」It's always the source./Session Status**：Width and Open on `prefs.json`（It's not like it's a good idea.
+  Object source exists in memory (reopening desktop to default「Auto-follow」）。
+- When multiple connections share the same memory directory,**AI Configure to be independent by connecting**（Connect key only in the memory of each side of the car process;
+  AI Saved in Column「Current Configuration」**All shared.**Yeah.

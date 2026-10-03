@@ -1,5 +1,5 @@
 /backend/target/
-# 构建产物：由 go build 生成，不进仓库；但打包（_buildpkg.js）与两个 e2e 需要它存在于磁盘
+# Build product: by go build Generated, not in the warehouse; but packed (_buildpkg.js）with two e2e We need it on disk.
 /backend/*.exe
 /bin/
 /frontend/node_modules/
@@ -19,7 +19,7 @@ frontend/.pnpm-store/
 .zcode/
 _e2e_tmp
 _e2e_ui_tmp
-# 交叉编译产物（_release.mjs 生成）：darwin/linux 侧车二进制，供 _buildpkg.js --target 使用
+# Cross-compilation product(s)_release.mjs Generating:darwin/linux Sidecar binary for _buildpkg.js --target Use
 /_xbuild/
 _verify_tmp/
 _probe_test_tmp/

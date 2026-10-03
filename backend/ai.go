@@ -1,28 +1,31 @@
-// AI 接入：把笔记交给第三方模型做分析 / 润色 / 续写 / 问答。
+// AI Access: handing over notes to third-party models for analysis / Polish / Continue writing / Questions and answers.
 //
-// 为什么走侧车而不是前端：
-//   - 插件 UI 在沙箱里没有网络，前端直连要声明 host.network:https://origin（≤8 个、仅 HTTPS、
-//     不允许路径/通配符、仍受 CORS），而第三方网关常带自定义路径 —— 侧车网络不受这些限制。
-//   - 连接密钥只会被宿主补齐给「后端生命周期请求」（connection/test|connect|action），
-//     前端只有 connectionId。所以密钥只能在侧车用，也绝不允许进日志 / 错误信息 / 前端响应。
+// Why the sidecar instead of the frontend:
+//   - Plugin UI There's no network in the sandbox. The front-end straight-end company wants to state. host.network:https://origin（≤8 One, just... HTTPS、
+//     Path not allowed/wildcard, still received CORS），The third-party gateway often carries a custom path -- side-car network is not subject to these restrictions.
+//   - The connection key will only be filled by the host.「Backend life cycle request」（connection/test|connect|action），
+//     Front End Only connectionId。So the key can only be used in the sidecar and never enter the log. / Error message / Front-end response.
 //
-// 为什么不用宿主的 host.ai（内置 AI 面板）：
-//   那个接口只是「打开一个带数据快照的对话」，既不返回模型回复、也不暴露模型配置，
-//   做不了「AI 结果写回笔记」这件核心事；而权限声明是静态的，旧宿主遇到未知权限会在
-//   安装阶段直接拒绝 —— 等于为一个用不上的入口把 <0.6.20 的用户全挡在门外。
+// Why don't you use the host's? host.ai（Internal AI Panel:
 //
-// 配置分两层（本文件的核心设计）：
-//   aiConn  —— 连接参数带来的（external_config.ai_* / connection_secrets.ai_api_key），易失；
-//              每次 connection/connect 前清空重填，disconnect 时清空。
-//   aiLocal —— 用户在「AI 助手栏 → 配置」里改的，持久化到 <dataDir>/ai-config.json。
-//   生效值 = 连接层打底 → 本机层逐字段覆盖非空值。
-//   于是：连接里配好的人什么都不用管；在面板里改过的人不必回去改连接；面板里「清除本机配置」
-//   一键回到「以连接配置为准」。
+//	That interface was just...「Open a conversation with a data snapshot」，I don't want to go back to the model or expose the model configuration.
+//	I can't.「AI And then I wrote back.」The core thing; the statement of authority is static and the old host will encounter unknown privileges
+//	The installation phase is directly rejected -- equal to an unused entry point <0.6.20 The users are all blocked out.
 //
-// 密钥的边界（安全底线）：
-//   默认只在内存里。只有当用户在面板里显式勾选「在本机记住密钥」时，才会写进
-//   <dataDir>/ai-config.json（0600，插件私有目录，不在笔记存储目录里）。
-//   无论哪种情况，密钥都不会出现在日志、错误信息、RPC 响应（只回 hasKey 布尔）与笔记文件里。
+// Configure in two layers (the core design of this document):
+//
+//	aiConn  —— Linking Parametersexternal_config.ai_* / connection_secrets.ai_api_key），Vulnerability;
+//	           Every time connection/connect It's empty.disconnect Time clear.
+//	aiLocal —— User in「AI Helpbar → Configure」It's changed. <dataDir>/ai-config.json。
+//	Valid value = Base Level of Connection → This layer covers non-empty values by field.
+//	So: the person who's connected doesn't have to do anything; the person who's changed in the panel doesn't have to go back to the connection; the person who's changed in the panel.「Clear local settings」
+//	One key back.「Based on connection configuration」。
+//
+// Key boundary (security bottom):
+//
+//	Default is only in memory. Only if the user is visible in the panel「Remember key on this machine」It'll be written when it's done.
+//	<dataDir>/ai-config.json（0600，Plugin private directory, not in the Note Storage Directory.
+//	In either case, the key does not appear in the log, the error message,RPC Response hasKey In the notes.
 package main
 
 import (
@@ -44,17 +47,17 @@ import (
 )
 
 const (
-	aiDefaultProvider   = "openai"
+	aiDefaultProvider    = "openai"
 	aiDefaultTimeoutSecs = 60
 	aiMinTimeoutSecs     = 5
 	aiMaxTimeoutSecs     = 300
 	aiDefaultMaxChars    = 12000
 	aiMinMaxChars        = 500
 	aiMaxMaxChars        = 200000
-	aiMaxResponseBytes   = 4 << 20 // 单次响应体上限，防止被超大响应拖垮
+	aiMaxResponseBytes   = 4 << 20 // Single-responder caps to prevent super-heavy. Response Drag Down.
 )
 
-// aiSettings 是一层配置。Enabled 用指针是为了区分「没提这件事」（nil）与「明确关闭」（false）。
+// aiSettings is a layer configuration.Enabled The pointer is to distinguish.「I didn't mention it.」（nil）with「Clear Close」（false）。
 type aiSettings struct {
 	Enabled      *bool  `json:"enabled,omitempty"`
 	Provider     string `json:"provider,omitempty"`
@@ -66,7 +69,7 @@ type aiSettings struct {
 	MaxChars     int    `json:"maxChars,omitempty"`
 }
 
-// aiConfigFile 是本机层落盘的样子。
+// aiConfigFile It's the way this plane is falling.
 type aiConfigFile struct {
 	aiSettings
 	Version     int    `json:"version"`
@@ -76,16 +79,16 @@ type aiConfigFile struct {
 
 var (
 	aiMu           sync.RWMutex
-	aiConn         aiSettings // 连接层（易失）
-	aiLocal        aiSettings // 本机层（面板保存，可持久化）
-	aiLocalHasFile bool       // 本机是否已有保存的 AI 配置
-	aiRememberKey  bool       // 本机文件里是否包含密钥
-	aiLoaded       bool       // 是否已尝试从磁盘读取本机层
+	aiConn         aiSettings // Connect layer (failible)
+	aiLocal        aiSettings // This layer (panel saved, sustainable)
+	aiLocalHasFile bool       // Do you have a record on this machine? AI Configure
+	aiRememberKey  bool       // Does this machine file contain a key?
+	aiLoaded       bool       // Have you tried to read the machine layer from the disk?
 )
 
 func aiConfigPath() string { return filepath.Join(dataDir(), "ai-config.json") }
 
-/* ---------------- 本机层的读写 ---------------- */
+/* ---------------- Read and write on this floor ---------------- */
 
 func loadAIConfigFromDisk() {
 	aiMu.Lock()
@@ -98,7 +101,7 @@ func loadAIConfigFromDisk() {
 	}
 	var f aiConfigFile
 	if json.Unmarshal(b, &f) != nil {
-		// 文件损坏时当作没有，不阻断启动（下次保存会覆盖掉）
+		// If the file is damaged, do not block startup (next save will be covered)
 		sidecarTrace("ai-config.json parse failed; ignoring file")
 		return
 	}
@@ -109,7 +112,7 @@ func loadAIConfigFromDisk() {
 		aiLocal.Provider, aiLocal.Model, aiLocal.APIKey != ""))
 }
 
-// ensureAILoaded 懒加载：生产环境 main() 会先调一次；测试直接跑 Handler 时靠这里兜住。
+// ensureAILoaded Lazy: Production environment main() We'll do it first; the test runs. Handler It's on this side.
 func ensureAILoaded() {
 	aiMu.RLock()
 	done := aiLoaded
@@ -120,8 +123,8 @@ func ensureAILoaded() {
 	loadAIConfigFromDisk()
 }
 
-// saveAILocalLocked 把本机层写盘。**只在调用方已持有 aiMu 时使用**。
-// remember=false 时不写密钥（同时把文件里旧的密钥一并抹掉）。
+// saveAILocalLocked Write disks on this floor.**Only held by Caller aiMu use**。
+// remember=false Do not write keys from time to time (and erase old keys from the file together).
 func saveAILocalLocked(remember bool) error {
 	if err := os.MkdirAll(dataDir(), 0o755); err != nil {
 		return err
@@ -139,14 +142,14 @@ func saveAILocalLocked(remember bool) error {
 	if err := writeAtomic(path, append(b, '\n')); err != nil {
 		return err
 	}
-	// 密钥在里面，权限收紧（Windows 上基本是 no-op，Unix 上有效）
+	// Keys are in there. Permissions are tightened.Windows Mostly. no-op，Unix It's working.
 	_ = os.Chmod(path, 0o600)
 	return nil
 }
 
-/* ---------------- 生效值 ---------------- */
+/* ---------------- Valid value ---------------- */
 
-// applyOver 用 src 的非空字段覆盖 dst（连接层打底、本机层覆盖，就是靠这个函数叠出来的）。
+// applyOver Use src Non-empty Field Overwrite dst（This function is the basis of the interconnection layer, which is covered by the in-house layer.
 func applyOver(dst *aiSettings, src aiSettings) {
 	if src.Enabled != nil {
 		v := *src.Enabled
@@ -175,7 +178,7 @@ func applyOver(dst *aiSettings, src aiSettings) {
 	}
 }
 
-// aiMergeLocked 计算生效值。**只在调用方已持有 aiMu（读或写）时使用**。
+// aiMergeLocked Calculates the effective value.**Only held by Caller aiMu（Use when reading or writing)**。
 func aiMergeLocked() aiSettings {
 	out := aiSettings{Provider: aiDefaultProvider, TimeoutSecs: aiDefaultTimeoutSecs, MaxChars: aiDefaultMaxChars}
 	applyOver(&out, aiConn)
@@ -199,19 +202,19 @@ func aiEffective() aiSettings {
 	return aiMergeLocked()
 }
 
-// aiSnapshot 保留这个名字给日志与测试用：返回当前生效值。
+// aiSnapshot Keeps the name for log and test: returns the current active value.
 func aiSnapshot() aiSettings { return aiEffective() }
 
 func aiIsEnabled(c aiSettings) bool { return c.Enabled != nil && *c.Enabled }
 
-/* ---------------- 从连接参数吸收（连接层） ---------------- */
+/* ---------------- Absorption from connecting parameters (connection layers) ---------------- */
 
 var aiConnKeys = map[string]bool{
 	"ai_enabled": true, "ai_provider": true, "ai_base_url": true, "ai_model": true,
 	"ai_api_key": true, "ai_system_prompt": true, "ai_timeout_secs": true, "ai_max_chars": true,
 }
 
-// lookupKeys 在任意嵌套的 map/数组里按 key 名找值（与 storage_dir 的取法一致，容错优先）。
+// lookupKeys It's all in the bag. map/Press in array key Name value (and storage_dir It's the same method of extraction, priority for error).
 func lookupKeys(v any, keys map[string]bool, out map[string]any) {
 	switch t := v.(type) {
 	case map[string]any:
@@ -285,7 +288,7 @@ func asInt(v any, def, min, max int) int {
 	return clampInt(n, def, min, max)
 }
 
-// absorbAIConfig 从连接参数里吸收 AI 配置，只写连接层（易失），不落盘。
+// absorbAIConfig Absorption from connecting parameters AI Configure, write only connect layers (failible), and do not leave a disk.
 func absorbAIConfig(values map[string]any) {
 	if len(values) == 0 {
 		return
@@ -318,7 +321,7 @@ func absorbAIConfig(values map[string]any) {
 		}
 	}
 	if v, ok := found["ai_api_key"]; ok {
-		// 空串不覆盖已有密钥：用户编辑连接时留空表示"不改密码"。
+		// Empty string does not overwrite existing keys: leave empty when user edits connection"Do Not Change Password"。
 		if s := asString(v); s != "" {
 			aiConn.APIKey = s
 		}
@@ -359,15 +362,15 @@ func clampInt(n, def, min, max int) int {
 	return n
 }
 
-// resetAIConn 断开连接时清掉连接层（本机层是用户在本机的选择，保留）。
+// resetAIConn Clears the interface layer when the connection is disconnected (this layer is the user ' s choice on the machine, keeping).
 func resetAIConn() {
 	aiMu.Lock()
 	aiConn = aiSettings{}
 	aiMu.Unlock()
 }
 
-// resetAIConfig 清空内存里的两层，并标记"已加载"以避免再去读本机文件。
-// 仅供测试与内部使用 —— 它不会删除本机文件。
+// resetAIConfig Empty two layers of memory and mark"Loaded"To avoid going back to the machine.
+// Only for testing and internal use -- it does not delete this machine file.
 func resetAIConfig() {
 	aiMu.Lock()
 	defer aiMu.Unlock()
@@ -378,9 +381,9 @@ func resetAIConfig() {
 	aiLoaded = true
 }
 
-/* ---------------- 状态与配置视图 ---------------- */
+/* ---------------- Status and Configuration View ---------------- */
 
-// aiConfigView 给前端的完整配置视图。**永远不含密钥本体**，只有 hasKey 布尔。
+// aiConfigView Full configuration view for the frontend.**Never Without Key Body**，Only  hasKey Boole.
 func aiConfigView() map[string]any {
 	ensureAILoaded()
 	aiMu.RLock()
@@ -403,7 +406,7 @@ func aiConfigView() map[string]any {
 		missing = append(missing, "apiKey")
 	}
 
-	// 哪些字段是被本机（面板）配置顶掉的 —— 界面据此提示「清除本机配置」可回到连接配置
+	// Which fields are capped by the configuration of the machine (panel) - this is the basis for the interface.「Clear local settings」Return to Connection Configuration
 	overridden := []string{}
 	if local.Enabled != nil {
 		overridden = append(overridden, "enabled")
@@ -455,12 +458,12 @@ func aiConfigView() map[string]any {
 	return out
 }
 
-/* ---------------- 请求构造 ---------------- */
+/* ---------------- Request Construction ---------------- */
 
 const aiDefaultSystem = "You are a precise technical writing assistant for database engineers. " +
 	"Answer directly and specifically without pleasantries. Do not repeat source text or add unrelated advice."
 
-// aiTaskLabel 给错误信息用的人话任务名（前端传的是 analyze/polish/... 这种 id）。
+// aiTaskLabel The name of the voice job for which the error message was given. analyze/polish/... This one. id）。
 func aiTaskLabel(task string) string {
 	switch task {
 	case "analyze":
@@ -475,15 +478,15 @@ func aiTaskLabel(task string) string {
 	return task
 }
 
-// aiTaskNeedsText 报告这个任务是否**必须有正文**。
-// 「分析」「润色」的语义就是处理一份现成的文本，没有正文做不了；
-// 「提问」和「续写」在没正文时仍然有意义（纯对话 / 按你的要求自由创作）。
+// aiTaskNeedsText Report whether the mission is...**There must be text**。
+// 「Analyze」「Polish」The semantic is to deal with a ready-made text without the text;
+// 「Ask」and「Continue writing」Still meaningful in the absence of text (pure dialogue) / Make it as you wish.
 func aiTaskNeedsText(task string) bool {
 	return task == "analyze" || task == "polish"
 }
 
-// aiTaskPrompt 构造提示词。text 为空时**不能**再拼一段空的"笔记正文" ——
-// 那会让模型以为你给了它一份空笔记，进而不停追问或干脆胡编。
+// aiTaskPrompt Constructs the hint.text is empty**I can't.**One more piece."Text of Notes" ——
+// That makes the model think you gave it an empty note, and then you keep asking or making it up.
 func aiTaskPrompt(task, text, instruction string) (system, user string) {
 	has := strings.TrimSpace(text) != ""
 	switch task {
@@ -576,7 +579,7 @@ func redact(s string, c aiSettings) string {
 	return s
 }
 
-// truncateChars 按字符（rune）截断，避免截出半个 UTF-8。
+// truncateChars By Characterrune）Cut it off. UTF-8。
 func truncateChars(s string, limit int) (string, bool) {
 	if limit <= 0 || utf8.RuneCountInString(s) <= limit {
 		return s, false
@@ -594,8 +597,8 @@ type aiResult struct {
 	SentChars int
 }
 
-// aiCall 用给定的配置（而不是全局）发一次请求 —— 配置由调用方决定，
-// 「测试连接」因此可以在不改动生效配置的前提下试一套未保存的参数。
+// aiCall Send a request with the given configuration (rather than the global) - the configuration is determined by the caller.
+// 「Test connection」An unsaved set of parameters can therefore be tested without changing the effective configuration.
 func aiCall(reqText aiRequest, maxTokens int, c aiSettings) (*aiResult, error) {
 	if !aiIsEnabled(c) {
 		return nil, fmt.Errorf("AI is disabled. Enable AI in the connection settings or AI assistant settings.")
@@ -740,7 +743,7 @@ func aiTaskPromptUser(req aiRequest, text string) string {
 	return u
 }
 
-// snippet 给错误信息带一点响应体上下文，但不泄漏密钥。
+// snippet Gives a response context to the error, but does not leak the key.
 func snippet(b []byte) string {
 	s := strings.TrimSpace(string(b))
 	if len(s) > 300 {
@@ -783,7 +786,7 @@ func aiChatHandler(raw json.RawMessage) (any, *dbxpluginsdk.PluginError) {
 	}
 	if strings.TrimSpace(req.Text) == "" {
 		if aiTaskNeedsText(req.Task) {
-			// 「分析/润色」没有正文做不了：给出可操作的说法，别只说"缺少要处理的正文"
+			// 「Analyze/Polish」Can't do it without the text: give an actionable statement, don't just say"Lack of body to process"
 			return nil, badParams("%s requires note text. Select some content or switch the scope to the entire note. "+
 				"(To chat without a note, use Ask.)", aiTaskLabel(req.Task))
 		}
@@ -819,7 +822,7 @@ func aiChatHandler(raw json.RawMessage) (any, *dbxpluginsdk.PluginError) {
 	}, nil
 }
 
-// setConfigParams 只处理"传了的字段"，没传的保持原样（面板里的密码框留空 = 不改密钥）。
+// setConfigParams Deal only"Passed Fields"，Unspoiled keep as it is. = Do not change the key.
 type setConfigParams struct {
 	Enabled      *bool   `json:"enabled"`
 	Provider     *string `json:"provider"`
@@ -834,7 +837,7 @@ type setConfigParams struct {
 	Persist      *bool   `json:"persist"`
 }
 
-// aiSetConfigHandler 更新本机层。persist=false 时只改内存（不落盘）。
+// aiSetConfigHandler Updates the current layer.persist=false Only memory is changed.
 func aiSetConfigHandler(raw json.RawMessage) (any, *dbxpluginsdk.PluginError) {
 	var p setConfigParams
 	if e := json.Unmarshal(raw, &p); e != nil {
@@ -876,8 +879,8 @@ func aiSetConfigHandler(raw json.RawMessage) (any, *dbxpluginsdk.PluginError) {
 	if p.RememberKey != nil {
 		remember = *p.RememberKey
 	}
-	// 连接参数里已经有密钥、用户又在面板里填了新的，就默认按"记住"处理？不 ——
-	// 落盘与否必须由用户显式勾选决定，不做隐式推断。
+	// A key already exists in the connection parameter and the user fills a new one in the panel."Remember."Handle? No...
+	// Whether or not to set a disk must be determined by a user ' s explicit tick, without a hidden inference.
 	persist := p.Persist == nil || *p.Persist
 	var saveErr error
 	if persist {
@@ -901,7 +904,7 @@ func aiSetConfigHandler(raw json.RawMessage) (any, *dbxpluginsdk.PluginError) {
 	return out, nil
 }
 
-// aiResetConfigHandler 清掉本机层（含磁盘文件），回到「以连接配置为准」。
+// aiResetConfigHandler Clear the floor. Go back.「Based on connection configuration」。
 func aiResetConfigHandler() (any, *dbxpluginsdk.PluginError) {
 	ensureAILoaded()
 	aiMu.Lock()
@@ -918,7 +921,7 @@ func aiResetConfigHandler() (any, *dbxpluginsdk.PluginError) {
 	return out, nil
 }
 
-// testParams 允许「测试一组还没保存的参数」：留空的字段沿用当前生效值。
+// testParams Allow「Test a set of unsaved parameters」：The empty field follows the current active value.
 type testParams struct {
 	Enabled      *bool  `json:"enabled"`
 	Provider     string `json:"provider"`
@@ -929,8 +932,8 @@ type testParams struct {
 	TimeoutSecs  int    `json:"timeoutSecs"`
 }
 
-// aiTestHandler 用给定参数（留空则用当前生效配置）发一次最小请求。
-// **不修改生效配置** —— 测坏了不会把用户原本能用的配置搞坏。
+// aiTestHandler Sends a minimum request with the given parameter (suspension with current effective configuration).
+// **Do not change effective configuration** —— It doesn't break the user's original configuration.
 func aiTestHandler(raw json.RawMessage) (any, *dbxpluginsdk.PluginError) {
 	var p testParams
 	if len(raw) > 0 {
@@ -965,5 +968,5 @@ func aiTestHandler(raw json.RawMessage) (any, *dbxpluginsdk.PluginError) {
 	}, nil
 }
 
-// aiTest 供连接表单的「测试 AI 连接」动作使用：用当前已吸收的连接参数试一次。
+// aiTest To connect the forms「Test AI Connection」Action use: Try with the currently absorbed connecting parameters.
 func aiTest() (any, *dbxpluginsdk.PluginError) { return aiTestHandler(nil) }

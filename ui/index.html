@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body class="light">
-  <!-- 三栏：目录区 | 笔记区 | AI 助手区。两条 .gutter 是可拖动的分隔条。 -->
+  <!-- Three columns: Directory area | Note area | AI Assistant area. Two. .gutter is a dragable partition. -->
   <div id="app" data-ai="off">
     <aside id="sidebar">
       <div class="side-head">
@@ -42,8 +42,8 @@
     <div id="gutter-side" class="gutter" role="separator" aria-orientation="vertical" title="Drag to resize sidebar (double-click to reset)"></div>
 
     <main id="main">
-      <!-- 置顶诊断条：上线时已关闭（app.js 里 SHOW_DIAG_BAR=false）。
-           日后需要排障：把 app.js 的 SHOW_DIAG_BAR 改成 true，并把下面这段取消注释即可。
+      <!-- Toppoint diagnostic bar: Closed on line (app.js Lee. SHOW_DIAG_BAR=false）。
+           We'll need a barrier later: app.js SHOW_DIAG_BAR Replace with true，And just remove the note from the following paragraph.
            <div id="diag-bar" class="diag-bar" data-sev="warn">
              <div class="diag-head">
                <span class="diag-dot"></span>
@@ -68,8 +68,8 @@
           <!-- <button id="btn-copy-sql">Copy SQL to DBX</button> -->
           <span class="sep"></span>
           <button id="btn-export-md">Export .md</button>
-          <!-- 导入功能暂时下线（app.js 里 ENABLE_IMPORT=false）。
-               恢复：把 app.js 的 ENABLE_IMPORT 改成 true，并把下面两处取消注释。 -->
+          <!-- Import function temporarily down (app.js Lee. ENABLE_IMPORT=false）。
+               Restore: Put app.js ENABLE_IMPORT Replace with true，And take the following two off. -->
           <!-- <button id="btn-import-md">Import .md</button> -->
           <button id="btn-backup-zip">Backup zip</button>
           <button id="btn-restore-zip">Restore Backup…</button>
@@ -104,7 +104,7 @@
 
     <div id="gutter-ai" class="gutter" role="separator" aria-orientation="vertical" title="Drag to resize AI assistant (double-click to reset)"></div>
 
-    <!-- AI 助手：常驻右栏（不是弹窗）。默认「聊天」模式；「创作」模式才有分析对象与写回操作。 -->
+    <!-- AI Assistant: Permanent right-hand column (not dialogs). Default「Chat」Modalities;「Create」mode is used to analyse objects and write back. -->
     <aside id="ai-panel" class="ai-panel" hidden>
       <div class="aip-head">
         <span class="aip-brand">AI Assistant</span>
@@ -114,19 +114,19 @@
         <button id="aip-close" class="icon-btn" title="Close (Ctrl/Cmd+I)">&#10005;</button>
       </div>
 
-      <!-- 两种模式：
-           聊天（默认）—— 纯对话，只发你的消息，不带任何笔记内容；
-           创作 —— 可指定「分析对象」，结果带四个写回操作。 -->
+      <!-- Two models:
+           Chat (default) - pure conversation, only text you, without any notes;
+           Create - may specify「Analysis target」，The result is four write back operations. -->
       <div class="aip-views" id="aip-views">
         <button id="aip-view-chat" type="button" title="Chat: send only your message, without note content">Chat</button>
         <button id="aip-view-create" type="button" title="Work with notes: choose content and write results back">Create</button>
       </div>
 
-      <!-- 上半区整块可滚动；底部的输入/发送区固定在栏底，绝不被内容挤出去 -->
+      <!-- The whole block of the first half is scrollable; bottom input/Sending area is fixed to the bottom of the bar, and it's never crowded out. -->
       <div id="aip-scroll" class="aip-scroll">
-        <!-- 只有「创作」模式才显示：分析对象 + 任务 -->
+        <!-- Only 「Create」Mode to display: + Tasks -->
         <div id="aip-create-only" class="aip-create-only" hidden>
-          <!-- 分析对象：显式可控，且跟着编辑器实时刷新（划选/输入都会更新） -->
+          <!-- Analytic object: Visible controlable and updated in real time with editor (select)/) -->
           <div class="aip-target">
             <div class="aip-target-bar">
               <span class="aip-target-title">Content to analyze</span>
@@ -152,7 +152,7 @@
         </div>
       </div>
 
-      <!-- 固定不动的底栏：不被上面的内容挤出可见区域 -->
+      <!-- Fixed bottombar: Do not crowd out visible areas from above -->
       <div class="aip-compose">
         <textarea id="aip-input" class="aip-input" placeholder="Say something to AI…"></textarea>
         <div class="aip-compose-bar">
@@ -163,13 +163,13 @@
     </aside>
   </div>
 
-  <!-- 通用弹窗：重命名 / 确认 / 移动 / 导出降级 -->
+  <!-- General Blast Window: Rename / Confirm. / Move / Export downgrade -->
   <div id="modal" class="modal" hidden></div>
 
-  <!-- 目录树右键菜单 -->
+  <!-- Right-click menu for directory tree -->
   <div id="ctx-menu" class="ctx-menu" hidden></div>
 
-  <!-- 从表新建笔记 -->
+  <!-- New Note From Table -->
   <div id="table-modal" class="modal" hidden>
     <div class="modal-card">
       <h3>New Note for This Table</h3>
@@ -187,7 +187,7 @@
   </div>
 
 
-  <!-- AI 模型配置（弹框）：不再占用聊天区，随时点 ⚙ 打开 -->
+  <!-- AI Model configuration (bullet frames): no longer occupying chat areas, at any time ⚙ Open -->
   <div id="ai-cfg-modal" class="modal" hidden>
     <div class="modal-card">
       <h3>AI Model Settings</h3>

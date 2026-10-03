@@ -1,6 +1,6 @@
 {
-  "name": "AI.MD 笔记",
-  "description": "Markdown 笔记，支持连接类型：在 DBX 中新建「AI.MD 笔记」连接即可打开笔记工作台。笔记落盘到连接配置里的存储目录，并可作为 mdnotes:// 虚拟文件系统浏览编辑。内置 AI 助手（右侧常驻栏），可接入任意 OpenAI 兼容 / Anthropic / Ollama 模型对笔记做分析、润色、续写与问答。",
+  "name": "AI.MD Notes",
+  "description": "Markdown notes connection type for DBX. Notes are stored as real .md files in the configured directory and exposed through the mdnotes:// virtual filesystem. Includes an AI assistant for analysis, polishing, continuation, and Q&A with OpenAI-compatible, Anthropic, or Ollama models.",
   "icon": "assets/plugin.svg",
   "tags": [
     "md",
@@ -15,5 +15,5 @@
   "source": "https://github.com/lukelwai/dbx-md-notes",
   "homepage": "https://github.com/lukelwai/dbx-md-notes",
   "license": "Apache-2.0",
-  "releaseNotes": "AI 助手改为两种模式：默认「聊天」（纯对话，不需要分析对象），切到「创作」才显示分析对象与四个写回操作（插入/替换/追加/复制）。模型配置改为右上角 ⚙ 打开的独立弹框，不再占用聊天区；弹框按钮吸底，内容长时主按钮也不会被滚出视野。"
+  "releaseNotes": "The AI assistant now has two modes: Chat for direct conversation and Create for note-aware analysis with insert, replace, append, and copy actions. Model settings now open in a dedicated dialog whose sticky action bar remains visible while scrolling."
 }

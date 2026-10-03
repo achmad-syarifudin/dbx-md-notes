@@ -23,14 +23,14 @@ func callRaw(t *testing.T, method string, params any) (any, *dbxpluginsdk.Plugin
 	return (&plugin{}).Handle(dbxpluginsdk.RequestContext{}, method, raw, nil)
 }
 
-// connectParams 构造宿主真实下发的生命周期参数形状：
+// connectParams Construct the shape of the host ' s real downtime life cycle parameters:
 // {provider:{...}, connection:{external_config:{...}, connection_secrets:{...}}, runtime:{...}}
 func connectParams(dir string, ai map[string]any, key string) map[string]any {
 	ec := map[string]any{"storage_dir": dir}
 	for k, v := range ai {
 		ec[k] = v
 	}
-	conn := map[string]any{"id": "c-ai", "name": "MD 笔记", "external_config": ec}
+	conn := map[string]any{"id": "c-ai", "name": "MD Notes", "external_config": ec}
 	if key != "" {
 		conn["connection_secrets"] = map[string]any{"ai_api_key": key}
 	}
@@ -69,7 +69,7 @@ func fakeModel(t *testing.T, status int, body string, seen *http.Request, seenBo
 	return srv
 }
 
-const openAIJSON = `{"model":"fake-1","choices":[{"message":{"content":"润色后的正文"}}],` +
+const openAIJSON = `{"model":"fake-1","choices":[{"message":{"content":"Text after colour"}}],` +
 	`"usage":{"prompt_tokens":12,"completion_tokens":7}}`
 
 func TestAIChatOpenAICompatible(t *testing.T) {
@@ -78,74 +78,74 @@ func TestAIChatOpenAICompatible(t *testing.T) {
 	srv := fakeModel(t, 200, openAIJSON, &gotReq, &gotBody)
 	enableAI(t, srv.URL+"/v1", "fake-1", "openai", "sk-secret-1234567890", nil)
 
-	res, perr := callRaw(t, "ai/chat", map[string]any{"task": "polish", "text": "原文", "instruction": "更简洁"})
+	res, perr := callRaw(t, "ai/chat", map[string]any{"task": "polish", "text": "Original", "instruction": "It's simpler."})
 	if perr != nil {
-		t.Fatalf("ai/chat 失败：%s", perr.Message)
+		t.Fatalf("ai/chat Failed:%s", perr.Message)
 	}
 	out := res.(map[string]any)
-	if out["content"] != "润色后的正文" {
-		t.Fatalf("正文不对：%v", out["content"])
+	if out["content"] != "Text after colour" {
+		t.Fatalf("Text is wrong:%v", out["content"])
 	}
 	if gotReq.URL.Path != "/v1/chat/completions" {
-		t.Fatalf("路径不对：%s", gotReq.URL.Path)
+		t.Fatalf("Other Organiser%s", gotReq.URL.Path)
 	}
 	if gotReq.Header.Get("Authorization") != "Bearer sk-secret-1234567890" {
-		t.Fatalf("鉴权头不对：%q", gotReq.Header.Get("Authorization"))
+		t.Fatalf("It's wrong.%q", gotReq.Header.Get("Authorization"))
 	}
-	if !strings.Contains(gotBody, "Polish") || !strings.Contains(gotBody, "更简洁") {
-		t.Fatalf("提示词没带上任务与额外要求：%s", gotBody)
+	if !strings.Contains(gotBody, "Polish") || !strings.Contains(gotBody, "It's simpler.") {
+		t.Fatalf("The message does not include tasks and additional requirements:%s", gotBody)
 	}
 	usage := out["usage"].(map[string]any)
 	if usage["promptTokens"] != 12 || usage["completionTokens"] != 7 {
-		t.Fatalf("usage 解析不对：%v", usage)
+		t.Fatalf("usage Other Organiser%v", usage)
 	}
 }
 
 func TestAIChatAnthropic(t *testing.T) {
 	var gotReq http.Request
-	srv := fakeModel(t, 200, `{"model":"claude-x","content":[{"type":"text","text":"分析结果"}],`+
+	srv := fakeModel(t, 200, `{"model":"claude-x","content":[{"type":"text","text":"Analysis"}],`+
 		`"usage":{"input_tokens":3,"output_tokens":4}}`, &gotReq, nil)
 	enableAI(t, srv.URL, "claude-x", "anthropic", "sk-ant-1234567890", nil)
 
-	res, perr := callRaw(t, "ai/chat", map[string]any{"task": "analyze", "text": "正文"})
+	res, perr := callRaw(t, "ai/chat", map[string]any{"task": "analyze", "text": "note body"})
 	if perr != nil {
-		t.Fatalf("ai/chat 失败：%s", perr.Message)
+		t.Fatalf("ai/chat Failed:%s", perr.Message)
 	}
-	if res.(map[string]any)["content"] != "分析结果" {
-		t.Fatalf("正文不对：%v", res)
+	if res.(map[string]any)["content"] != "Analysis" {
+		t.Fatalf("Text is wrong:%v", res)
 	}
 	if gotReq.URL.Path != "/v1/messages" {
-		t.Fatalf("路径不对：%s", gotReq.URL.Path)
+		t.Fatalf("Other Organiser%s", gotReq.URL.Path)
 	}
 	if gotReq.Header.Get("x-api-key") == "" || gotReq.Header.Get("anthropic-version") == "" {
-		t.Fatalf("Anthropic 必需头缺失：%v", gotReq.Header)
+		t.Fatalf("Anthropic Required head missing:%v", gotReq.Header)
 	}
 }
 
-// 鉴权失败时必须给出可读中文，并且**不能把密钥回显到错误信息里**。
+// In case of failure, you must give a readable Chinese.**Could not close temporary folder: %s**。
 func TestAIChatAuthErrorRedactsKey(t *testing.T) {
 	const key = "sk-super-secret-value-9999"
 	srv := fakeModel(t, 401, `{"error":{"message":"invalid api key sk-super-secret-value-9999"}}`, nil, nil)
 	enableAI(t, srv.URL+"/v1", "fake-1", "openai", key, nil)
 
-	_, perr := callRaw(t, "ai/chat", map[string]any{"task": "analyze", "text": "正文"})
+	_, perr := callRaw(t, "ai/chat", map[string]any{"task": "analyze", "text": "note body"})
 	if perr == nil {
-		t.Fatalf("401 应该报错")
+		t.Fatalf("401 You should have.")
 	}
 	if !strings.Contains(perr.Message, "Authentication failed") {
-		t.Fatalf("错误信息不够可读：%s", perr.Message)
+		t.Fatalf("The error message is not readable:%s", perr.Message)
 	}
 	if strings.Contains(perr.Message, key) {
-		t.Fatalf("错误信息泄漏了密钥：%s", perr.Message)
+		t.Fatalf("Error message leaked key:%s", perr.Message)
 	}
 }
 
 func TestAIChatRejectsNonJSON(t *testing.T) {
 	srv := fakeModel(t, 200, "<html>gateway error</html>", nil, nil)
 	enableAI(t, srv.URL+"/v1", "fake-1", "openai", "sk-1234567890", nil)
-	_, perr := callRaw(t, "ai/chat", map[string]any{"task": "analyze", "text": "正文"})
+	_, perr := callRaw(t, "ai/chat", map[string]any{"task": "analyze", "text": "note body"})
 	if perr == nil || !strings.Contains(perr.Message, "Could not parse") {
-		t.Fatalf("非 JSON 应给出可读错误，实际：%v", perr)
+		t.Fatalf("Not JSON Readable errors should be given, in fact:%v", perr)
 	}
 }
 
@@ -154,30 +154,30 @@ func TestAIChatTruncatesLongText(t *testing.T) {
 	srv := fakeModel(t, 200, openAIJSON, nil, &gotBody)
 	enableAI(t, srv.URL+"/v1", "fake-1", "openai", "sk-1234567890", map[string]any{"ai_max_chars": 500})
 
-	long := strings.Repeat("字", 1200)
+	long := strings.Repeat("Word", 1200)
 	res, perr := callRaw(t, "ai/chat", map[string]any{"task": "analyze", "text": long})
 	if perr != nil {
-		t.Fatalf("ai/chat 失败：%s", perr.Message)
+		t.Fatalf("ai/chat Failed:%s", perr.Message)
 	}
 	out := res.(map[string]any)
 	if out["truncated"] != true {
-		t.Fatalf("应标记已截断：%v", out)
+		t.Fatalf("It should be marked out:%v", out)
 	}
 	if int(out["sentChars"].(int)) != 500 {
-		t.Fatalf("送入应被截到 500 字符：%v", out["sentChars"])
+		t.Fatalf("Sending should be intercepted. 500 Character:%v", out["sentChars"])
 	}
-	if strings.Contains(gotBody, strings.Repeat("字", 1000)) {
-		t.Fatalf("超长正文没有被截断")
+	if strings.Contains(gotBody, strings.Repeat("Word", 1000)) {
+		t.Fatalf("The super-long text was not cut off.")
 	}
 }
 
 func TestAIChatRejectsUnknownTask(t *testing.T) {
 	enableAI(t, "http://127.0.0.1:1/v1", "m", "openai", "sk-1234567890", nil)
 	if _, perr := callRaw(t, "ai/chat", map[string]any{"task": "hack", "text": "x"}); perr == nil {
-		t.Fatalf("未知任务应被拒")
+		t.Fatalf("Unknown task should be rejected")
 	}
 	if _, perr := callRaw(t, "ai/chat", map[string]any{"task": "analyze", "text": "  "}); perr == nil {
-		t.Fatalf("空正文应被拒")
+		t.Fatalf("Empty text should be rejected")
 	}
 }
 
@@ -185,21 +185,21 @@ func TestAIStatusReportsMissing(t *testing.T) {
 	resetAIConfig()
 	st := aiConfigView()
 	if st["ready"] != false || st["enabled"] != false {
-		t.Fatalf("未配置时应 ready=false：%v", st)
+		t.Fatalf("When not configured ready=false：%v", st)
 	}
 	enableAI(t, "http://127.0.0.1:1/v1", "m", "openai", "", nil)
 	st = aiConfigView()
 	if st["ready"] != false || st["hasKey"] != false {
-		t.Fatalf("缺密钥时应 ready=false：%v", st)
+		t.Fatalf("When a key is missing ready=false：%v", st)
 	}
-	// Ollama 不需要密钥
+	// Ollama No key required
 	enableAI(t, "http://127.0.0.1:11434/v1", "qwen", "ollama", "", nil)
 	if st = aiConfigView(); st["ready"] != true {
-		t.Fatalf("ollama 无密钥也应 ready：%v", st)
+		t.Fatalf("ollama No key also. ready：%v", st)
 	}
 }
 
-// 连接动作「测试 AI 连接」：参数里带的是**未保存的表单值**，也要能用。
+// Connect Actions「Test AI Connection」：In the parameters,**Unsaved Form Values**，It has to work.
 func TestConnectionActionTestAI(t *testing.T) {
 	resetAIConfig()
 	srv := fakeModel(t, 200, openAIJSON, nil, nil)
@@ -214,24 +214,24 @@ func TestConnectionActionTestAI(t *testing.T) {
 		},
 	})
 	if err != nil {
-		t.Fatalf("connection/action 失败：%s", err.Message)
+		t.Fatalf("connection/action Failed:%s", err.Message)
 	}
 	out := res.(map[string]any)
 	if out["success"] != true || !strings.Contains(out["message"].(string), "Connection successful") {
-		t.Fatalf("测试连接应成功：%v", out)
+		t.Fatalf("The test connection should be successful:%v", out)
 	}
-	// 未启用 / 未知动作
+	// Not enabled / Unknown Action
 	if _, err := callRaw(t, "connection/action", map[string]any{"action": map[string]any{"id": "nope"}}); err == nil {
-		t.Fatalf("未知动作应报错")
+		t.Fatalf("Unknown action should be reported")
 	}
 	resetAIConfig()
 	res2, _ := callRaw(t, "connection/action", map[string]any{"action": map[string]any{"id": "test-ai"}})
 	if res2.(map[string]any)["success"] != false {
-		t.Fatalf("未启用时应返回 success=false：%v", res2)
+		t.Fatalf("Return when not enabled success=false：%v", res2)
 	}
 }
 
-// connectAIConn 只填连接层（不清本机层）：用于验证「重连不会冲掉面板里的改动」。
+// connectAIConn Filling only the interface layer (unsure): for validation「Reconnection doesn't flush out changes in the panel.」。
 func connectAIConn(t *testing.T, base, model, provider, key string) {
 	t.Helper()
 	resetAIConn()
@@ -242,48 +242,48 @@ func connectAIConn(t *testing.T, base, model, provider, key string) {
 	}})
 }
 
-/* ---------------- 分层配置：连接层 / 本机层 ---------------- */
+/* ---------------- Layer Configuration: Connect Layer / Level ---------------- */
 
-// 面板保存的配置逐字段覆盖连接参数；「清除本机配置」后回到连接参数。
+// The configuration saver of the panel overlays the connecting parameters by field;「Clear local settings」.
 func TestAIConfigLocalOverridesConnection(t *testing.T) {
 	t.Setenv("DBX_PLUGIN_DATA_DIR", t.TempDir())
 	resetAIConfig()
 	connectAIConn(t, "http://127.0.0.1:1/v1", "conn-model", "openai", "sk-conn-1234567890")
 	if got := aiEffective().Model; got != "conn-model" {
-		t.Fatalf("连接层未生效：%s", got)
+		t.Fatalf("Connection layer not effective:%s", got)
 	}
 
 	res, perr := callRaw(t, "ai/setConfig", map[string]any{"model": "panel-model", "persist": true})
 	if perr != nil {
-		t.Fatalf("ai/setConfig 失败：%s", perr.Message)
+		t.Fatalf("ai/setConfig Failed:%s", perr.Message)
 	}
 	if res.(map[string]any)["model"] != "panel-model" {
-		t.Fatalf("返回值未反映新配置：%v", res)
+		t.Fatalf("Return value does not reflect new configuration:%v", res)
 	}
 	eff := aiEffective()
 	if eff.Model != "panel-model" {
-		t.Fatalf("本机层应覆盖 model：%s", eff.Model)
+		t.Fatalf("This layer should be covered. model：%s", eff.Model)
 	}
 	if eff.BaseURL != "http://127.0.0.1:1/v1" || eff.APIKey != "sk-conn-1234567890" {
-		t.Fatalf("未改动的字段应沿用连接层：%+v", eff)
+		t.Fatalf("Unchanged fields should follow the interface layer:%+v", eff)
 	}
 
-	// 重连（宿主每次打开工作台都会 connect）不该把面板里的改动冲掉
+	// Reconnection. connect）Shouldn't have washed out the changes in the panel.
 	connectAIConn(t, "http://127.0.0.1:1/v1", "conn-model", "openai", "sk-conn-1234567890")
 	if got := aiEffective().Model; got != "panel-model" {
-		t.Fatalf("重连后本机层应仍优先：%s", got)
+		t.Fatalf("The reconnection of this layer should remain a priority:%s", got)
 	}
 
-	// 清除本机配置 → 回到连接参数
+	// Clear local settings → Back to connection parameters
 	if _, perr := callRaw(t, "ai/resetConfig", map[string]any{}); perr != nil {
-		t.Fatalf("ai/resetConfig 失败：%s", perr.Message)
+		t.Fatalf("ai/resetConfig Failed:%s", perr.Message)
 	}
 	if got := aiEffective().Model; got != "conn-model" {
-		t.Fatalf("清除后应回到连接配置：%s", got)
+		t.Fatalf("After clearance, go back to the connection configuration:%s", got)
 	}
 }
 
-// 安全底线（默认）：面板里填的密钥只在内存，不落盘；显式勾选「在本机记住密钥」后才写文件。
+// Safety bottom line (default): Keys filled in panel are memory only and do not drop discs; visible tick「Remember key on this machine」Other Organiser
 func TestAIPanelKeyNotOnDiskUnlessRemembered(t *testing.T) {
 	dataDir := t.TempDir()
 	t.Setenv("DBX_PLUGIN_DATA_DIR", dataDir)
@@ -294,61 +294,61 @@ func TestAIPanelKeyNotOnDiskUnlessRemembered(t *testing.T) {
 		"enabled": true, "provider": "openai", "baseUrl": "http://127.0.0.1:1/v1",
 		"model": "panel-model", "apiKey": key, "persist": true,
 	}); e != nil {
-		t.Fatalf("setConfig 失败：%s", e.Message)
+		t.Fatalf("setConfig Failed:%s", e.Message)
 	}
 	cfgPath := filepath.Join(dataDir, "ai-config.json")
 	b, err := os.ReadFile(cfgPath)
 	if err != nil {
-		t.Fatalf("配置文件应已生成：%v", err)
+		t.Fatalf("Profile should have been generated:%v", err)
 	}
 	if strings.Contains(string(b), key) {
-		t.Fatalf("默认不该把密钥写进磁盘：%s", b)
+		t.Fatalf("The default key should not be written on disk:%s", b)
 	}
 	if aiEffective().APIKey != key {
-		t.Fatalf("会话内密钥应可用")
+		t.Fatalf("Session key should be available")
 	}
-	// 非密钥字段必须已经落盘
+	// Non-key fields must have been dropped
 	if !strings.Contains(string(b), "panel-model") {
-		t.Fatalf("非密钥字段应落盘：%s", b)
+		t.Fatalf("Non-key fields should be set down:%s", b)
 	}
 
-	// 显式勾选后才落盘
+	// Show check before drop
 	if _, e := callRaw(t, "ai/setConfig", map[string]any{"rememberKey": true, "persist": true}); e != nil {
-		t.Fatalf("setConfig 失败：%s", e.Message)
+		t.Fatalf("setConfig Failed:%s", e.Message)
 	}
 	b, err = os.ReadFile(cfgPath)
 	if err != nil || !strings.Contains(string(b), key) {
-		t.Fatalf("勾选后应把密钥落盘：%v / %s", err, b)
+		t.Fatalf("Check this out and drop the key:%v / %s", err, b)
 	}
 	if runtime.GOOS != "windows" {
 		if st, _ := os.Stat(cfgPath); st != nil && st.Mode().Perm() != 0o600 {
-			t.Fatalf("含密钥的配置文件权限应为 0600，实际 %o", st.Mode().Perm())
+			t.Fatalf("The configuration file with key should read 0600，Actual %o", st.Mode().Perm())
 		}
 	}
 
-	// 模拟重启：内存清空后从磁盘恢复
+	// Simulation restart: recovery from disk after emptied memory
 	resetAIConfig()
 	loadAIConfigFromDisk()
 	if got := aiEffective(); got.APIKey != key || got.Model != "panel-model" {
-		t.Fatalf("重启后应从磁盘恢复配置：%+v", got)
+		t.Fatalf("Restart from disk configuration:%+v", got)
 	}
 	if v := aiConfigView(); v["keyOnDisk"] != true || v["keyFrom"] != "local" {
-		t.Fatalf("状态应标明密钥来自本机：%v", v)
+		t.Fatalf("The state should indicate the key from the machine:%v", v)
 	}
 
-	// 清除本机配置：文件删掉、本机层清空
+	// Clear the configuration: delete files, empty the plane
 	if _, e := callRaw(t, "ai/resetConfig", map[string]any{}); e != nil {
-		t.Fatalf("resetConfig 失败：%s", e.Message)
+		t.Fatalf("resetConfig Failed:%s", e.Message)
 	}
 	if _, err := os.Stat(cfgPath); !os.IsNotExist(err) {
-		t.Fatalf("清除后配置文件应被删除：%v", err)
+		t.Fatalf("After clearance profile should be deleted:%v", err)
 	}
 	if aiEffective().APIKey != "" {
-		t.Fatalf("清除后不该还有密钥")
+		t.Fatalf("There shouldn't be a key after the cleanup.")
 	}
 }
 
-// 「测试连接」用未保存的参数试，但**不得改动**当前生效配置。
+// 「Test connection」Try with unsaved parameters, but**No change.**Current effective configuration.
 func TestAITestDoesNotMutateConfig(t *testing.T) {
 	t.Setenv("DBX_PLUGIN_DATA_DIR", t.TempDir())
 	srv := fakeModel(t, 200, openAIJSON, nil, nil)
@@ -360,21 +360,21 @@ func TestAITestDoesNotMutateConfig(t *testing.T) {
 		"baseUrl": srv.URL + "/v1", "model": "other-model", "apiKey": "sk-other-1234567890",
 	})
 	if perr != nil {
-		t.Fatalf("ai/test 失败：%s", perr.Message)
+		t.Fatalf("ai/test Failed:%s", perr.Message)
 	}
 	if res.(map[string]any)["success"] != true {
-		t.Fatalf("测试应成功：%v", res)
+		t.Fatalf("The test shall be successful:%v", res)
 	}
 	eff := aiEffective()
 	if eff.Model != "keep-model" || eff.BaseURL != "http://127.0.0.1:1/v1" {
-		t.Fatalf("ai/test 不该改动生效配置：%+v", eff)
+		t.Fatalf("ai/test changed the effective configuration: %+v", eff)
 	}
 	if _, err := os.Stat(filepath.Join(os.Getenv("DBX_PLUGIN_DATA_DIR"), "ai-config.json")); !os.IsNotExist(err) {
-		t.Fatalf("ai/test 不该写盘：%v", err)
+		t.Fatalf("ai/test Shouldn't write:%v", err)
 	}
 }
 
-// 面板改配置时没传的字段保持原样（密码框留空 = 不改密钥）。
+// Keep undelivered fields as they are when the panel is reconfigured (cipher box empty) = Do not change the key.
 func TestAISetConfigPartialUpdate(t *testing.T) {
 	t.Setenv("DBX_PLUGIN_DATA_DIR", t.TempDir())
 	resetAIConfig()
@@ -382,33 +382,33 @@ func TestAISetConfigPartialUpdate(t *testing.T) {
 		"enabled": true, "provider": "anthropic", "baseUrl": "http://127.0.0.1:1/v1",
 		"model": "m1", "apiKey": "sk-keep-me-1234567890", "timeoutSecs": 30, "persist": true,
 	}); e != nil {
-		t.Fatalf("setConfig 失败：%s", e.Message)
+		t.Fatalf("setConfig Failed:%s", e.Message)
 	}
-	// 只改模型，不传密钥
+	// Change only the model, no key.
 	if _, e := callRaw(t, "ai/setConfig", map[string]any{"model": "m2", "persist": true}); e != nil {
-		t.Fatalf("setConfig 失败：%s", e.Message)
+		t.Fatalf("setConfig Failed:%s", e.Message)
 	}
 	eff := aiEffective()
 	if eff.Model != "m2" || eff.APIKey != "sk-keep-me-1234567890" || eff.Provider != "anthropic" || eff.TimeoutSecs != 30 {
-		t.Fatalf("未传的字段应保持原样：%+v", eff)
+		t.Fatalf("Unsigned fields should remain as they are:%+v", eff)
 	}
-	// clearKey 显式清掉
+	// clearKey Clear it out.
 	if _, e := callRaw(t, "ai/setConfig", map[string]any{"clearKey": true, "persist": true}); e != nil {
-		t.Fatalf("setConfig 失败：%s", e.Message)
+		t.Fatalf("setConfig Failed:%s", e.Message)
 	}
 	if aiEffective().APIKey != "" {
-		t.Fatalf("clearKey 应清掉密钥")
+		t.Fatalf("clearKey The key should be cleared.")
 	}
-	// 非法 provider 被忽略（不写入垃圾值）
+	// Illegal provider Ignored (not writing trash value)
 	if _, e := callRaw(t, "ai/setConfig", map[string]any{"provider": "hack", "persist": true}); e != nil {
-		t.Fatalf("setConfig 失败：%s", e.Message)
+		t.Fatalf("setConfig Failed:%s", e.Message)
 	}
 	if aiEffective().Provider != "anthropic" {
-		t.Fatalf("非法 provider 应被忽略：%s", aiEffective().Provider)
+		t.Fatalf("Illegal provider Should be ignored:%s", aiEffective().Provider)
 	}
 }
 
-/* ---------------- UI 偏好 ---------------- */
+/* ---------------- UI Preferences ---------------- */
 
 func TestPrefsWhitelistAndClamp(t *testing.T) {
 	dataDir := t.TempDir()
@@ -416,46 +416,46 @@ func TestPrefsWhitelistAndClamp(t *testing.T) {
 	if _, e := callRaw(t, "ui/setPrefs", map[string]any{"prefs": map[string]any{
 		"sidebarWidth": 300, "aiWidth": 99999, "aiPanelOpen": true, "evil": "x",
 	}}); e != nil {
-		t.Fatalf("ui/setPrefs 失败：%s", e.Message)
+		t.Fatalf("ui/setPrefs Failed:%s", e.Message)
 	}
 	res, e := callRaw(t, "ui/getPrefs", map[string]any{})
 	if e != nil {
-		t.Fatalf("ui/getPrefs 失败：%s", e.Message)
+		t.Fatalf("ui/getPrefs Failed:%s", e.Message)
 	}
 	p := res.(map[string]any)["prefs"].(map[string]any)
 	if p["sidebarWidth"] != 300 {
-		t.Fatalf("sidebarWidth 应保留：%v", p["sidebarWidth"])
+		t.Fatalf("sidebarWidth To be retained:%v", p["sidebarWidth"])
 	}
 	if p["aiWidth"] != 720 {
-		t.Fatalf("超范围的宽度应被钳到 720：%v", p["aiWidth"])
+		t.Fatalf("The width of the hyperscope should be cut. 720：%v", p["aiWidth"])
 	}
 	if _, ok := p["evil"]; ok {
-		t.Fatalf("白名单外的键不该被写入：%v", p)
+		t.Fatalf("Keys outside the white list should not be written:%v", p)
 	}
 	if _, ok := p["aiPanelOpen"]; !ok {
-		t.Fatalf("aiPanelOpen 应保留：%v", p)
+		t.Fatalf("aiPanelOpen To be retained:%v", p)
 	}
-	// 低于下限 → 180；且部分更新不丢掉已有键
+	// Below lower limit → 180；and partially update without missing existing keys
 	if _, e := callRaw(t, "ui/setPrefs", map[string]any{"prefs": map[string]any{"aiWidth": 10}}); e != nil {
-		t.Fatalf("ui/setPrefs 失败：%s", e.Message)
+		t.Fatalf("ui/setPrefs Failed:%s", e.Message)
 	}
 	res, _ = callRaw(t, "ui/getPrefs", map[string]any{})
 	p = res.(map[string]any)["prefs"].(map[string]any)
 	if p["aiWidth"] != 180 || p["sidebarWidth"] != 300 {
-		t.Fatalf("钳制/合并结果不对：%v", p)
+		t.Fatalf("Cursor/The merger did not work:%v", p)
 	}
 	if _, err := os.Stat(filepath.Join(dataDir, "prefs.json")); err != nil {
-		t.Fatalf("prefs.json 应存在：%v", err)
+		t.Fatalf("prefs.json There should be:%v", err)
 	}
 }
 
 /*
- * 没有笔记正文时的行为（v0.8.3）：
- *   「提问」退化成纯对话、「续写」退化成按你的要求自由生成 —— 都还能用；
- *   「分析」「润色」的语义就是处理一份现成文本，必须拒绝，**且错误信息要给出出路**
- *   （只说"缺少要处理的正文"，用户不知道下一步该做什么）。
- * 另外：没有正文时**绝不能**再往提示词里拼一段空的"笔记正文" ——
- * 那会让模型以为你给了一份空笔记。
+ * Behavior when there are no notes in the text(s)v0.8.3）：
+ *   「Ask」Degraded to pure dialogue,「Continue writing」It's degenerated into a free generation as you want -- it works.
+ *   「Analyze」「Polish」The semantic is to deal with a text that is ready to be rejected.**And the error message will give us a way out.**
+ *   （Just say it."Lack of body to process"，Users do not know what to do next.
+ * Plus: When there is no text**Never.**Scramble a blank in the hint."Text of Notes" ——
+ * That makes the model think you gave an empty note.
  */
 func TestAIChatWithoutNoteText(t *testing.T) {
 	var gotBody string
@@ -463,45 +463,45 @@ func TestAIChatWithoutNoteText(t *testing.T) {
 	resetAIConfig()
 	enableAI(t, srv.URL+"/v1", "fake-1", "openai", "sk-1234567890", nil)
 
-	// 提问 + 只有问题 → 纯对话
-	res, perr := callRaw(t, "ai/chat", map[string]any{"task": "ask", "text": "   ", "instruction": "你好"})
+	// Ask + Just the problem. → Pure conversation
+	res, perr := callRaw(t, "ai/chat", map[string]any{"task": "ask", "text": "   ", "instruction": "Hello."})
 	if perr != nil {
-		t.Fatalf("没有正文的「提问」应该可用（纯对话）：%s", perr.Message)
+		t.Fatalf("No text.「Ask」Should be available (pure dialogue):%s", perr.Message)
 	}
-	if res.(map[string]any)["content"] != "润色后的正文" {
-		t.Fatalf("结果应正常返回：%v", res)
+	if res.(map[string]any)["content"] != "Text after colour" {
+		t.Fatalf("The result should be a normal return:%v", res)
 	}
-	if !strings.Contains(gotBody, "haven't provided any note text") || !strings.Contains(gotBody, "你好") {
-		t.Fatalf("提示词应说明没有笔记上下文并带上问题：%s", gotBody)
+	if !strings.Contains(gotBody, "haven't provided any note text") || !strings.Contains(gotBody, "Hello.") {
+		t.Fatalf("The reminder shall state that there are no notes and there are questions:%s", gotBody)
 	}
 	if strings.Contains(gotBody, "Note content:") {
-		t.Fatalf("没有正文时不该拼空的「笔记正文」段落：%s", gotBody)
+		t.Fatalf("We shouldn't be empty without the text.「Text of Notes」Paragraph:%s", gotBody)
 	}
 
-	// 续写：没要求 → 拒绝；有要求 → 自由生成
+	// Continuation: No request → Rejected; requested → Free Generate
 	if _, e := callRaw(t, "ai/chat", map[string]any{"task": "continue", "text": ""}); e == nil {
-		t.Fatalf("没有正文也没有要求的「续写」应被拒")
+		t.Fatalf("There's nothing to ask for.「Continue writing」It should be rejected.")
 	}
-	if _, e := callRaw(t, "ai/chat", map[string]any{"task": "continue", "text": "", "instruction": "写一句问候"}); e != nil {
-		t.Fatalf("有要求的「续写」应该可用（自由生成）：%s", e.Message)
+	if _, e := callRaw(t, "ai/chat", map[string]any{"task": "continue", "text": "", "instruction": "Write a greeting."}); e != nil {
+		t.Fatalf("It's a request.「Continue writing」Should be available (freely generated):%s", e.Message)
 	}
-	if !strings.Contains(gotBody, "写一句问候") {
-		t.Fatalf("要求没进提示词：%s", gotBody)
+	if !strings.Contains(gotBody, "Write a greeting.") {
+		t.Fatalf("Request not included:%s", gotBody)
 	}
 
-	// 分析 / 润色：必须拒绝，并且要告诉用户怎么解决
+	// Analyze / Motion: Must refuse and tell the user how to fix it
 	for _, task := range []string{"analyze", "polish"} {
 		_, e := callRaw(t, "ai/chat", map[string]any{"task": task, "text": "   "})
 		if e == nil {
-			t.Fatalf("%s 没有正文时应被拒", task)
+			t.Fatalf("%s If you don't have the text, you should be rejected.", task)
 		}
 		if !strings.Contains(e.Message, "entire note") || !strings.Contains(e.Message, "Ask") {
-			t.Fatalf("%s 的错误信息要给出路（整篇笔记 / 提问）：%s", task, e.Message)
+			t.Fatalf("%s Error messages is for the way out. / Question:%s", task, e.Message)
 		}
 	}
 }
 
-// **安全底线**：密钥不得出现在数据目录或笔记目录的任何文件里。
+// **Security floor**：Keys should not appear in any file in the data directory or in the notes directory.
 func TestAISecretNeverTouchesDisk(t *testing.T) {
 	const key = "sk-must-not-be-persisted-42"
 	dataDir := t.TempDir()
@@ -513,16 +513,16 @@ func TestAISecretNeverTouchesDisk(t *testing.T) {
 		"ai_enabled": true, "ai_provider": "openai",
 		"ai_base_url": "http://127.0.0.1:1/v1", "ai_model": "m",
 	}, key)); err != nil {
-		t.Fatalf("connect 失败：%s", err.Message)
+		t.Fatalf("connect Failed:%s", err.Message)
 	}
-	// 顺手落一次笔记，确认常规写入路径也带不出密钥
+	// Put down a note to confirm that the normal writing path does not carry a key
 	if _, err := callRaw(t, "notes/save", map[string]any{"data": map[string]any{
 		"version": 2, "nodes": []map[string]any{
-			{"id": "n1", "type": "note", "name": "标题", "parentId": nil, "content": "正文",
+			{"id": "n1", "type": "note", "name": "Title", "parentId": nil, "content": "note body",
 				"createdAt": "c", "updatedAt": "u"},
 		},
 	}}); err != nil {
-		t.Fatalf("save 失败：%s", err.Message)
+		t.Fatalf("save Failed:%s", err.Message)
 	}
 
 	for _, root := range []string{dataDir, storageDir} {
@@ -535,16 +535,16 @@ func TestAISecretNeverTouchesDisk(t *testing.T) {
 				return nil
 			}
 			if strings.Contains(string(b), key) {
-				t.Fatalf("密钥被写进了磁盘文件：%s", p)
+				t.Fatalf("Key is written into disk file:%s", p)
 			}
 			return nil
 		})
 	}
-	// 断开连接后内存里也不该留下密钥
+	// The key should not be left in memory after disconnection
 	if _, err := callRaw(t, "connection/disconnect", map[string]any{"connectionId": "c-ai"}); err != nil {
-		t.Fatalf("disconnect 失败：%s", err.Message)
+		t.Fatalf("disconnect Failed:%s", err.Message)
 	}
 	if aiSnapshot().APIKey != "" {
-		t.Fatalf("断开连接后仍残留密钥")
+		t.Fatalf("Key left after disconnect")
 	}
 }

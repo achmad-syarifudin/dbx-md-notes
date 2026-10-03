@@ -1,16 +1,16 @@
-// DBX MD 笔记 —— 原生侧车（Go，纯标准库 + 官方 Go SDK）
+// DBX MD Note — Native sidecarGo，Pure Standard Library + Official Go SDK）
 //
-// 存储模型（v2 起）：
-//   - 每条笔记 = 存储目录下的真实 .md 文件（按「文件夹层级/标题.md」落盘）
-//   - 每个文件夹 = 存储目录下的真实子目录
-//   - 结构/索引 = 存储目录下的 .mdnotes/meta.json（仅 id/名称/父子关系/路径/时间戳 + UI 状态，不含正文）
+// Storage Modelv2 Start:
+//   - Every note. = Real under Storage Directory .md File「Folder Level/Title.md」Discard
+//   - Each Folder = Real Subdirectories under Storage Directory
+//   - Structure/Index = Under Storage Directory .mdnotes/meta.json（Only id/Name/parent relationship/Path/timestamp + UI Status, without text)
 //
-// 为什么这样拆：
-//   - 单一 notes.json 在数据量大时读写/损坏风险高；拆成真实文件后每条笔记独立、可在外部编辑器直接打开、可被 grep。
-//   - notes/save 只重写「内容有变化」的笔记文件（内容哈希缓存），其余保持不动，写入放大可控。
+// Why are you doing this?
+//   - Single notes.json Read and write when data is big/High risk of damage; independent of each note after breaking into a real file, open directly in an external editor, accessible grep。
+//   - notes/save Rewrite Only「Change of content.」, the rest of the note file (Hashi Cache) remains unmovable and is written to be controlled.
 //
-// 持久化通道：插件 UI 跑在 sandboxed iframe 中，唯一可靠的落盘通道是
-// dbxPlugin.invoke(...) → 本进程写磁盘。前端不碰磁盘。
+// Plugin for Enduring Channels: UI Run in sandboxed iframe The only reliable persistence path is
+// dbxPlugin.invoke(...) → This process writes disks. The frontend does not touch the disk.
 package main
 
 import (
@@ -34,10 +34,10 @@ import (
 	dbxpluginsdk "github.com/lwai/mdnotes/dbxsdk"
 )
 
-// 必须与 manifest.json 的 id / version 完全一致，否则宿主判定 Sidecar 身份不匹配并丢弃。
+// must match manifest.json id / version It's all the same, or the host decides. Sidecar Identity does not match and is discarded.
 const (
 	pluginID      = "com.lwai.mdnotes"
-	pluginVersion = "0.8.4" // 仅作兜底；运行时以包内 manifest.json 的版本为准（见 resolveMetadata）
+	pluginVersion = "0.8.4" // only for the bottom;run in packages manifest.json Other Organiser resolveMetadata）
 )
 
 type plugin struct {
@@ -55,7 +55,7 @@ func failed(code int, err error) *dbxpluginsdk.PluginError {
 	return dbxpluginsdk.NewError(code, err.Error())
 }
 
-// ---------------- 请求分发 ----------------
+// ---------------- Distribution requested ----------------
 
 func (plugin *plugin) Handle(
 	_ dbxpluginsdk.RequestContext,
@@ -94,26 +94,26 @@ func (plugin *plugin) Handle(
 		}
 		plugin.mutex.Lock()
 		if plugin.connections == nil {
-			// 防御：main() 会初始化，但任何以 &plugin{} 构造的调用方（测试、将来的复用）
-			// 直接写 nil map 会 panic 并带走整个侧车进程。
+			// Defense:main() It'll be initialized, but any of it is. &plugin{} Constructed Caller (test, future reuse)
+			// Write directly. nil map panic And take the whole side of the car.
 			plugin.connections = map[string]struct{}{}
 		}
 		plugin.connections[connectionID] = struct{}{}
 		plugin.mutex.Unlock()
-		// absorbParams（Handle 入口已调用）会递归扫描 storage_dir；这里再补一刀，
-		// 覆盖 config 以字符串形态传入的场景。
+		// absorbParams（Handle It's on the way. storage_dir；Here's another one.
+		// Overwrite config The scene entered in string form.
 		if d := connDirFromValues(values); d != "" {
 			setDir(d)
 		}
-		// AI 配置同样只从连接参数里取（含补齐的 connection_secrets）。
-		// 先清掉上一个连接留下的连接层：本机层（面板保存）是用户在本机的选择，保留。
+		// AI Configure also only from connecting parameters (filled) connection_secrets）。
+		// First clear a bridge layer left by the previous connection: the current layer (panette save) is the user ' s choice in the machine and is retained.
 		resetAIConn()
 		absorbAIConfig(values)
 		_ = os.MkdirAll(notesDir(), 0o755)
 		_ = os.MkdirAll(metaDir(), 0o755)
 		sidecarTrace(fmt.Sprintf("connection/connect id=%s configured=%v dir=%s",
 			connectionID, dirConfigured(), notesDir()))
-		// 首次连接：把重构前的 notes.json 迁移成真实 .md 文件，避免老笔记"消失"。
+		// First Connection: Before Reconstruct notes.json Migration to reality .md File. Avoid old notes."Disappear."。
 		tryMigrate()
 		return map[string]any{
 			"success":     true,
@@ -129,13 +129,13 @@ func (plugin *plugin) Handle(
 		plugin.mutex.Lock()
 		delete(plugin.connections, connectionID)
 		plugin.mutex.Unlock()
-		// 断开连接即清空内存里的 AI 密钥，避免上一个连接的凭据被下一个连接复用。
+		// Disconnect to empty memory AI key, avoids the previous connection certificate being reused by the next connection.
 		resetAIConfig()
 		return map[string]any{"success": true}, nil
 
 	case "notes/ping":
-		// 版本必须报 resolveMetadata()（运行时读包内 manifest）而不是编译期常量 ——
-		// 常量会在发版时漂移，而 ping 的版本是前端和测试用来判断"跑的是不是新代码"的依据。
+		// The version must be reported. resolveMetadata()（In Run-time Read Package manifest）Other Organiser
+		// The constant floats on the hair. ping The version is the frontend and the test to judge."Is it a new code to run?"Basis.
 		return map[string]any{
 			"ok": true, "plugin": pluginID, "version": resolveMetadata().Version,
 			"storagePath": notesDir(),
@@ -146,9 +146,9 @@ func (plugin *plugin) Handle(
 		return map[string]any{"path": metaPath(), "dir": notesDir(), "configured": dirConfigured()}, nil
 
 	case "notes/probe":
-		// 轻量可写性探测：只往 .mdnotes/ 写一个探针文件，不碰索引、不碰正文。
-		// 前端启动时用它替代「保存一次完整快照」——后者会把该实例的旧快照推成权威状态，
-		// 在多实例共用同一目录时就是数据被回滚/删除的触发点。
+		// Light Scriptability Detection: Go Only .mdnotes/ Write a probe file, no index, no text.
+		// Replace it with the front-end startup「Save a complete snapshot」——The latter will push the old snapshot of the example into a state of authority.
+		// When multiple examples share the same directory, data is rolled back./Deletes the trigger point.
 		if err := os.MkdirAll(metaDir(), 0o755); err != nil {
 			return map[string]any{"ok": false, "dir": notesDir(), "error": err.Error()}, nil
 		}
@@ -206,9 +206,9 @@ func (plugin *plugin) Handle(
 	case "notes/exportNote":
 		var p struct {
 			ID string `json:"id"`
-			// ToDisk=false（默认）：把字节交回前端，由宿主原生「另存为」对话框落盘，
-			// 用户可自选目录。ToDisk=true：老行为，直接写进笔记存储目录（宿主没有
-			// saveFile 能力时的兜底）。
+			// ToDisk=false（Default: Turn the byte back to the frontend by the host's original「Save As」dialogue box,
+			// A user can choose a directory.ToDisk=true：Old behavior. Write it in the notes.
+			// saveFile The bottom of the power.
 			ToDisk bool `json:"toDisk"`
 		}
 		if e := json.Unmarshal(params, &p); e != nil {
@@ -246,7 +246,7 @@ func (plugin *plugin) Handle(
 		return aiResetConfigHandler()
 
 	case "ai/test":
-		// 参数可带一组"未保存的配置"用于试连（留空的字段沿用当前生效值）
+		// Parameters with a group"Unsaved Configuration"For trial reconnection (empty fields follow current active values)
 		return aiTestHandler(params)
 
 	case "ai/chat":
@@ -259,8 +259,8 @@ func (plugin *plugin) Handle(
 		return setPrefsHandler(params)
 
 	case "connection/action":
-		// 连接表单里的自定义动作（如「测试 AI 连接」）。参数同样带完整的 connection
-		// （含补齐的 connection_secrets），所以先吸收配置再执行 —— 用户不必先保存就能测。
+		// Connect custom actions in the form (e. g.「Test AI Connection」）。Parameters are also complete connection
+		// （It's perfect. connection_secrets），So absorb configurations before execution -- users can measure without saving them.
 		var p struct {
 			Action     map[string]any `json:"action"`
 			Values     map[string]any `json:"values"`
@@ -335,7 +335,7 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-// ---------------- 存储目录 ----------------
+// ---------------- Storage Directory ----------------
 
 var dirMu sync.Mutex
 var currentDir string
@@ -367,11 +367,11 @@ func dataDir() string {
 func metaDir() string  { return filepath.Join(notesDir(), ".mdnotes") }
 func metaPath() string { return filepath.Join(metaDir(), "meta.json") }
 
-// sidecarTrace 追加一行诊断记录到 <dataDir>/sidecar-trace.log（best-effort，永不阻断业务）。
+// sidecarTrace Add a line of diagnostic records to <dataDir>/sidecar-trace.log（best-effort，I'll never stop my business.
 //
-// 为什么需要它：侧车是否被宿主真正拉起、是否收到过 storage_dir、有没有走到 notes/save，
-// 只有侧车自己知道。出问题时这行日志能一句话定位环节，避免再从 UI 侧盲猜。
-// 超过 64KB 时整体清空，防止无限增长。
+// Why do you need it? Did the sidecar actually get pulled up by the host? Did you get it? storage_dir、Did you come? notes/save，
+// Only the sidecar knows. It's a problem. It's a good way to locate the link. UI Side blind guess.
+// Over 64KB The whole of the time is emptied to prevent unlimited growth.
 func sidecarTrace(msg string) {
 	path := filepath.Join(dataDir(), "sidecar-trace.log")
 	if st, err := os.Stat(path); err == nil && st.Size() > 64*1024 {
@@ -459,8 +459,8 @@ func notesDir() string {
 	return d
 }
 
-// dirConfigured 报告是否真有用户指定的存储目录（而非回退到隐藏的默认 dataDir）。
-// 前端据此判断是否要弹出「未配置存储目录」的醒目告警。
+// dirConfigured Whether the report really has a user specified memory directory (not back to hidden default) dataDir）。
+// This is how the frontends determine whether to pop up.「Unconfigured Storage Directory」Visible alarm.
 func dirConfigured() bool {
 	dirMu.Lock()
 	d := currentDir
@@ -468,12 +468,12 @@ func dirConfigured() bool {
 	return strings.TrimSpace(d) != ""
 }
 
-/* ---------------- UI 偏好（<dataDir>/prefs.json） ----------------
+/* ---------------- UI Preferences<dataDir>/prefs.json） ----------------
  *
- * 放这里而不是 localStorage：沙箱里 window.origin 是 "null"（opaque origin），
- * 访问 localStorage 会直接抛 SecurityError。
- * 放这里而不是笔记存储目录 / meta.json：面板宽度是"这台机器上的界面偏好"，
- * 不是笔记数据 —— 不该跟着笔记目录走，更不该让它在多实例间互相覆盖。
+ * Here, not here. localStorage：In the sandbox. window.origin yes "null"（opaque origin），
+ * Visits localStorage It'll just throw. SecurityError。
+ * Put it here instead of the notes. / meta.json：Panel width is"The interface on this machine is preferred."，
+ * It's not a note data -- it's not supposed to follow the notes directory, let alone overlay each other in multiple cases.
  */
 var prefKeys = map[string]bool{"sidebarWidth": true, "aiWidth": true, "aiPanelOpen": true}
 
@@ -489,11 +489,11 @@ func clampPrefWidth(v int) int {
 	return v
 }
 
-// sanitizePrefs 只保留白名单键，并把数值钳到合理范围（坏值不该把界面卡死）。
+// sanitizePrefs Only the white list key is maintained and the value is applied to a reasonable range (bad value should not be stuck).
 //
-// 注意：这个函数会被调用两次（读盘后一次、合并写入前一次），第二次拿到的宽度已经是
-// int 而不是 JSON 解出来的 float64 —— 所以数值必须两种类型都认。只认 float64 的话，
-// 第二次会把这些键当"坏值"丢掉（静默丢配置，实测踩过）。
+// Note: This function will be called twice (after readout, combined with the previous one) and the width obtained twice already is
+// int Not JSON It's solved. float64 —— So values must be recognized for both types. Just admit it. float64 And then,
+// The second time, they'll be the keys."Bad value"Dropped (quietly disassembled, measured).
 func sanitizePrefs(in map[string]any) map[string]any {
 	out := map[string]any{}
 	for k, v := range in {
@@ -558,7 +558,7 @@ func setPrefsHandler(raw json.RawMessage) (any, *dbxpluginsdk.PluginError) {
 			cur[k] = v
 		}
 	}
-	cur = sanitizePrefs(cur) // 归一化后再写，避免把前端传来的坏值落盘
+	cur = sanitizePrefs(cur) // Write it when it's normalized, and avoid dropping the bad value from the frontend.
 	if err := os.MkdirAll(dataDir(), 0o755); err != nil {
 		return nil, failed(-32012, fmt.Errorf("Cannot save interface preferences: %v", err))
 	}
@@ -572,10 +572,10 @@ func setPrefsHandler(raw json.RawMessage) (any, *dbxpluginsdk.PluginError) {
 	return map[string]any{"prefs": cur}, nil
 }
 
-// connDirFromValues 从 connection/connect 的参数里尽可能稳健地取出 storage_dir。
-// 覆盖：顶层 storage_dir、config/external_config/connection 嵌套对象，以及 config 以
-// 字符串形式传入（"storage_dir=..." 或 JSON 串）的情况。absorbParams 已做递归扫描，
-// 这里作为补充，避免宿主以非预期形态传递时静默丢失目录。
+// connDirFromValues From connection/connect The parameters to be taken out as smoothly as possible. storage_dir。
+// Overwrite: Top Layer storage_dir、config/external_config/connection Embedded objects, and config Here.
+// String in ("storage_dir=..." or JSON The situation.absorbParams I've done a back scan.
+// This is complemented by avoiding silent loss of the directory when the host passes in an unexpected form.
 func connDirFromValues(values map[string]any) string {
 	cands := []any{
 		values["storage_dir"], values["storageDir"],
@@ -591,7 +591,7 @@ func connDirFromValues(values map[string]any) string {
 			if s != "" && !strings.ContainsAny(s, "={}:") {
 				return s
 			}
-			// 形如 "storage_dir=D:\notes&name=..."
+			// Like "storage_dir=D:\notes&name=..."
 			if i := strings.Index(t, "storage_dir="); i >= 0 {
 				rest := t[i+len("storage_dir="):]
 				if e := strings.IndexAny(rest, "&\""); e >= 0 {
@@ -612,9 +612,9 @@ func connDirFromValues(values map[string]any) string {
 	return ""
 }
 
-// tryMigrate 把重构前的 notes.json（单一文件，存的就是前端快照）迁移成新的
-// 「真实 .md 文件 + .mdnotes/meta.json」模型。仅当 meta.json 还不存在时触发，
-// 避免重复迁移；任何解析/写入错误都跳过，绝不因此阻断正常启动。
+// tryMigrate Rebuild the pre-reform. notes.json（Single file, front-end snapshot. Move to new.
+// 「Real .md Documentation + .mdnotes/meta.json」Models. Only when meta.json It's not there yet.
+// Duplication of migration; any resolution/Write error skips and does not prevent normal startup.
 func tryMigrate() {
 	if metaExists() {
 		return
@@ -642,7 +642,7 @@ func tryMigrate() {
 	}
 }
 
-// ---------------- 元数据结构 ----------------
+// ---------------- Metadata structure ----------------
 
 type MetaNode struct {
 	ID        string  `json:"id"`
@@ -651,7 +651,7 @@ type MetaNode struct {
 	ParentID  *string `json:"parentId"`
 	CreatedAt string  `json:"createdAt,omitempty"`
 	UpdatedAt string  `json:"updatedAt,omitempty"`
-	File      string  `json:"file"` // 相对存储目录的路径：笔记 "x.md"，文件夹 "x"
+	File      string  `json:"file"` // Path to relative store directory: Notes "x.md"，Folder "x"
 }
 
 type Meta struct {
@@ -693,7 +693,7 @@ func saveMeta(m Meta) error {
 	return writeAtomic(metaPath(), b)
 }
 
-// ---------------- 文件名工具 ----------------
+// ---------------- Filename Tool ----------------
 
 func sanitizeName(name string) string {
 	s := strings.TrimSpace(name)
@@ -713,7 +713,7 @@ func sanitizeName(name string) string {
 	return s
 }
 
-// absUnique 返回 abs 不存在时的原值；若存在则追加 " (2)" 等后缀。
+// absUnique Back abs original value when it does not exist; if it exists, add " (2)" Wait a minute.
 func absUnique(abs string) string {
 	if _, err := os.Stat(abs); os.IsNotExist(err) {
 		return abs
@@ -736,15 +736,15 @@ func toRel(root, abs string) string {
 	return r
 }
 
-// ---------------- 内容哈希缓存（避免重复写盘） ----------------
+// ---------------- Content Hashi Cache (duplicate disk) ----------------
 
 var hashMu sync.Mutex
 
-// contentHashes 的 key 是【文件的绝对路径】，不是节点 id。
+// contentHashes key It's the absolute path, not the node. id。
 //
-// 用 id 做 key 会漏掉一个真实场景：用户把「笔记存储目录」改到新目录之后，同一个 id 的笔记在
-// 新目录里根本还不存在，但缓存仍记着「这个 id 的内容没变」→ 保存时整个跳过写盘 → 笔记在新目录
-// 里凭空消失。按路径做 key 才符合「同一个文件、内容没变」这句话的真实语义。
+// Use id Do it. key There's a real scene missing: users put「Note Storage Directory」After the new directory, the same id The notes are here.
+// The new directory doesn't exist yet, but the cache is still in the memory.「Here. id The content hasn't changed.」→ Skip the entire writing disk while saving → Notes in the new directory
+// It just disappeared. By Path key It fits.「Same file. Same text.」The true semantic of that sentence.
 var contentHashes = map[string]string{}
 
 func contentHash(content string) string {
@@ -752,7 +752,7 @@ func contentHash(content string) string {
 	return fmt.Sprintf("%x", h)
 }
 
-// isUnchanged 返回 true 表示 abs 处的文件内容与 content 一致（无需重写）。
+// isUnchanged Back true configuration abs Document content and content Unanimously (does not need to be rewritten).
 func isUnchanged(abs, hs string) bool {
 	hashMu.Lock()
 	if c, ok := contentHashes[abs]; ok && c == hs {
@@ -781,19 +781,19 @@ func writeContent(abs, content string) error {
 	return nil
 }
 
-// ---------------- 笔记快照（前端传入） ----------------
+// ---------------- Note snapshot (frontend in) ----------------
 
 type snapNode struct {
 	ID       string  `json:"id"`
 	Type     string  `json:"type"`
 	Name     string  `json:"name"`
 	ParentID *string `json:"parentId"`
-	// Content 用指针：nil = 「这次没带正文」，后端绝不写盘。
+	// Content With a pointer:nil = 「No text this time.」，Backends never write disks.
 	//
-	// 为什么不用 string：string 的零值是空串，与「用户真的把正文清空了」无法区分。
-	// 一旦前端因为某个文件读不到而拿不到正文，快照里就会是一个空串，
-	// 保存时把磁盘上的正文覆盖成空 —— 这就是「笔记内容被清空」的机制。
-	// 用指针后，「省略字段」本身就能表达"别动它"，不需要额外标志位配合。
+	// Why not? string：string Zero values are empty, with「The user really cleared the text.」Can't be distinguished.
+	// Once the frontend can't get the text because a file can't read it, the snapshot will be an empty string.
+	// Overwrite the text on the disk while saving -- this is「The notes were emptied.」Mechanisms.
+	// I don't know.「Ignore Fields」You can express it."Don't touch it."，No additional markers are required.
 	Content   *string `json:"content"`
 	CreatedAt string  `json:"createdAt"`
 	UpdatedAt string  `json:"updatedAt"`
@@ -802,19 +802,19 @@ type snapNode struct {
 type snap struct {
 	Version int        `json:"version"`
 	Nodes   []snapNode `json:"nodes"`
-	// DeletedIDs 是前端【显式】声明要删的节点 id（删除文件夹时含其全部子节点）。
+	// DeletedIDs It's the node to be deleted from the front-end declaration. id（Deletes a folder containing all its children.
 	//
-	// 绝不能把「不在 Nodes 里」当成删除：一个存储目录可能同时被多个连接/实例使用，
-	// 旧实例手里的快照天然缺少对方刚建的笔记，而它一保存就会把那些笔记删掉
-	// （2026-09-21 事故：重复用同一个目录建连接 → 一部分笔记被清空）。
-	// 语义改成「未知 ≠ 要删」后，这种行为就不可能再发生。
+	// Never.「No, I'm not. Nodes Lee.」Considers it deleted: a storage directory may be linked to multiple at the same time/The example is used.
+	// The snapshots in the old ones are naturally missing the notes that the other party just built, and it deletes them as soon as it's saved.
+	// （2026-09-21 Accident: Repeat connection to one directory → Some of the notes were emptied.
+	// Replace semantic with「Unknown ≠ To delete」Thereafter, such acts cannot be repeated.
 	DeletedIDs []string        `json:"deletedIds"`
 	ActiveID   string          `json:"activeId"`
 	Expanded   map[string]bool `json:"expanded"`
 	View       string          `json:"view"`
 }
 
-// computeRelPath 由父子链推导相对路径（文件名已 sanitize）。
+// computeRelPath Directed relative path by parent-son chain (file name already exists) sanitize）。
 func computeRelPath(n snapNode, byID map[string]snapNode) string {
 	var segs []string
 	pid := n.ParentID
@@ -835,11 +835,11 @@ func computeRelPath(n snapNode, byID map[string]snapNode) string {
 	return filepath.Join(segs...)
 }
 
-// trashPath 给出「回收站」里的目标路径。
+// trashPath Give「Trash」is the target path.
 //
-// 删除一律不硬删：先移到 <storage_dir>/.mdnotes/trash/<时间戳>/<原相对路径>。
-// 这样任何一次误删（旧快照、并发实例、以后的逻辑 bug）都还能捞回来，
-// 代价只是磁盘上多一份历史副本。
+// Delete without mandatory deletion: Move to <storage_dir>/.mdnotes/trash/<timestamp>/<Original relative path>。
+// Any such error (old snapshots, examples, later logic) bug）It's still coming back.
+// The price is just an extra historical copy on the disk.
 func trashPath(root, rel string) string {
 	stamp := time.Now().Format("20060102-150405")
 	return filepath.Join(root, ".mdnotes", "trash", stamp, rel)
@@ -874,12 +874,12 @@ func saveNotes(raw json.RawMessage) error {
 		deletedSet[id] = true
 	}
 
-	// 1) 删除：只处理前端【显式】声明要删的 id，且一律移入回收站而非硬删。
+	// 1) Delete: Only for the front-end [manifest] declaration to delete id，And move to the trash, not delete.
 	//
-	// 这里以前是「凡是不在快照里的节点就删文件」，语义上等于把「我没见过」当成
-	// 「用户要删」—— 一个存储目录被两个连接同时打开时，后打开的那个实例只要保存一次
-	// （打开工作台就会保存），就会把对方新建的笔记从磁盘上删掉。
-	// 现在：未知 ≠ 要删；真要删必须显式说。
+	// It used to be here.「If you're not in the snapshot, delete the file.」，Semantic equals「I haven't seen it.」Consider it...
+	// 「User to delete」—— When a memory directory is opened with two connections, the example that is then opened only once
+	// （Open the counter and save it) and remove the newly created notes from the disk.
+	// Now: Unknown ≠ To delete; to delete really has to be explicit.
 	trashed := 0
 	seenTrashDir := false
 	for id := range deletedSet {
@@ -889,14 +889,14 @@ func saveNotes(raw json.RawMessage) error {
 		}
 		abs := filepath.Join(root, old.File)
 		if _, err := os.Stat(abs); err != nil {
-			continue // 磁盘上本来就没有，不必处理
+			continue // It's not on the disk.
 		}
 		dst := trashPath(root, old.File)
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 			continue
 		}
 		if err := os.Rename(abs, dst); err != nil {
-			// 移不动就【不删】：宁可留下一个孤儿文件，也不做不可逆的销毁。
+			// [No deletion]: It is preferable to leave an orphan document without irreversible destruction.
 			sidecarTrace(fmt.Sprintf("notes/save trash FAILED rel=%s err=%v (original file preserved)", old.File, err))
 			continue
 		}
@@ -907,7 +907,7 @@ func saveNotes(raw json.RawMessage) error {
 		sidecarTrace(fmt.Sprintf("notes/save trashed=%d dir=%s", trashed, filepath.Join(root, ".mdnotes", "trash")))
 	}
 
-	// 2) 笔记：新建/移动文件 + 仅内容变化时写盘
+	// 2) Notes: New/Move File + Write disks only when content changes
 	result := []MetaNode{}
 	for _, n := range s.Nodes {
 		if n.Type != "note" || deletedSet[n.ID] {
@@ -926,7 +926,7 @@ func saveNotes(raw json.RawMessage) error {
 			_ = os.Rename(filepath.Join(root, old.File), absTarget)
 		}
 		mn.File = toRel(root, absTarget)
-		// Content == nil：这次没带正文（前端没读到 / 不打算改）→ 绝不用空内容覆盖磁盘。
+		// Content == nil：No text this time. / I'm not going to change.→ No blanks will be used to overwrite disks.
 		if n.Content != nil {
 			hs := contentHash(*n.Content)
 			if !isUnchanged(absTarget, hs) {
@@ -938,7 +938,7 @@ func saveNotes(raw json.RawMessage) error {
 		result = append(result, mn)
 	}
 
-	// 3) 文件夹：新建/移动目录（子项已在第 2 步自行落到新位置，这里只需清理旧空目录）
+	// 3) Folder: New/Move directory (subheading already 2 Step to new position, just clean the old directory)
 	for _, n := range s.Nodes {
 		if n.Type != "folder" || deletedSet[n.ID] {
 			continue
@@ -951,7 +951,7 @@ func saveNotes(raw json.RawMessage) error {
 			mn.File = rel
 		} else if rel != old.File {
 			_ = os.MkdirAll(filepath.Join(root, rel), 0o755)
-			// os.Remove 只删空目录；若里面还留着被保留（未在快照里）的子节点就删不掉 —— 这正是我们要的。
+			// os.Remove Only empty directories; if there are retained subpoints (not in the snapshot) that cannot be deleted -- that's what we want.
 			_ = os.Remove(filepath.Join(root, old.File))
 			mn.File = rel
 		} else {
@@ -960,8 +960,8 @@ func saveNotes(raw json.RawMessage) error {
 		result = append(result, mn)
 	}
 
-	// 4) 保留：既不在快照里、也没被显式删除的节点，原样留着。
-	//    它们通常是「另一个连接/实例里刚建的」——本实例没见过，不等于用户想删。
+	// 4) Reservations: Nodes that are neither in snapshots nor explicitly deleted are retained as they are.
+	//    They usually are.「Another connection./I just built it in the case.」——This example has not been seen and does not mean that users want to delete it.
 	preserved := 0
 	for _, old := range prev.Nodes {
 		if incomingSet[old.ID] || deletedSet[old.ID] {
@@ -983,14 +983,14 @@ func notesLoad() (any, *dbxpluginsdk.PluginError) {
 	tryMigrate()
 	m := loadMeta()
 	if len(m.Nodes) == 0 && !metaExists() {
-		// 首次运行：还没有任何数据，让前端去放示例笔记
+		// First run: There is no data yet, let the frontend put the example pen Remember
 		return map[string]any{
-			"data":   nil,
-			"path":   metaPath(),
-			"dir":    notesDir(),
-			"ok":     true,
+			"data":       nil,
+			"path":       metaPath(),
+			"dir":        notesDir(),
+			"ok":         true,
 			"configured": dirConfigured(),
-			"pending": takePending(),
+			"pending":    takePending(),
 		}, nil
 	}
 	nodes := []map[string]any{}
@@ -1007,11 +1007,11 @@ func notesLoad() (any, *dbxpluginsdk.PluginError) {
 			if data, err := os.ReadFile(filepath.Join(notesDir(), mn.File)); err == nil {
 				node["content"] = string(data)
 			} else {
-				// 读不到正文时【绝不能】回一个空串：前端会把空串当作"这篇笔记的正文"
-				// 原样保存回去，磁盘上的正文就被清空了。这里明确标记 missing，
-				// 前端据此既不显示为可编辑的空笔记、也不会把空内容写回。
+				// When you can't read the text, you can't return an empty string: the frontend will use it as an empty string."The body of the note."
+				// Save it as it is and the body on the disk is emptied. It's clearly marked here. missing，
+				// The frontend thus neither displays an editable empty note nor returns the blank.
 				node["contentMissing"] = true
-				sidecarTrace(fmt.Sprintf("notes/load content unreadable (frozen; will not write back): rel=%s err=%v", mn.File, err))
+				sidecarTrace(fmt.Sprintf("notes/load content not availableable (frozen; will not write back): rel=%s err=%v", mn.File, err))
 			}
 			node["file"] = mn.File
 		}
@@ -1019,27 +1019,27 @@ func notesLoad() (any, *dbxpluginsdk.PluginError) {
 	}
 	return map[string]any{
 		"data": map[string]any{
-			"version":   m.Version,
-			"nodes":     nodes,
-			"activeId":  m.ActiveID,
-			"expanded":  m.Expanded,
-			"view":      m.View,
+			"version":  m.Version,
+			"nodes":    nodes,
+			"activeId": m.ActiveID,
+			"expanded": m.Expanded,
+			"view":     m.View,
 		},
-		"path":   metaPath(),
-		"dir":    notesDir(),
-		"ok":     true,
+		"path":       metaPath(),
+		"dir":        notesDir(),
+		"ok":         true,
 		"configured": dirConfigured(),
-		"pending": takePending(),
+		"pending":    takePending(),
 	}, nil
 }
 
-// ---------------- 导出 / 备份 ----------------
+// ---------------- Export / Backup ----------------
 
-// exportNote 导出单篇笔记。
+// exportNote Export a single note.
 //
-// toDisk=false（默认）：返回 {name, fileName, dataBase64}，前端交给宿主的原生「另存为」
-// 对话框写盘 —— 这样用户能自己选目录和文件名，而不是被塞进笔记存储目录。
-// toDisk=true：老行为，在笔记存储目录里生成一份 .md 副本来回显路径（兜底用）。
+// toDisk=false（Default: Return {name, fileName, dataBase64}，The frontend to the host's original.「Save As」
+// Dialogue Writing Disk - This allows users to select their own directory and filename, rather than being plugged into the Note Storage Directory.
+// toDisk=true：Old behavior. Generates a copy of it in the notes. .md A copy of the loop path (for the bottom).
 func exportNote(id string, toDisk bool) (any, *dbxpluginsdk.PluginError) {
 	if id == "" {
 		return nil, badParams("missing id")
@@ -1099,19 +1099,19 @@ func subtreeIDs(m Meta, rootID string) map[string]bool {
 	return inc
 }
 
-// ---------------- 备份包格式 ----------------
+// ---------------- Backup package format ----------------
 //
-// 包内布局与磁盘布局 1:1，所以恢复就是一次朴素复制，不需要任何映射表：
+// Package Layout and Disk Layout 1:1，So recovery is a simple copy, without any map:
 //
-//	mdnotes-backup.json    备份元信息（版本 / 导出时间 / 当时的存储目录 / 计数）
-//	.mdnotes/meta.json     目录树索引（结构、名称、展开状态）
-//	<真实 .md 相对路径>     正文，与 meta.json 的 file 字段逐字对应
+//	mdnotes-backup.json    Backup meta-information (version) / Export Time / Current Storage Directory / Counted)
+//	.mdnotes/meta.json     Directory tree index (structure, name, spread)
+//	<Real .md Relative Path>     Text, with meta.json file Field by Word
 //
-// 只备份正文而不备份索引，恢复出来就是一堆没有名字和层级的孤儿文件 —— 所以索引必须随包走。
+// Backup is a collection of orphan files with no name and level -- so the index must go with the package.
 const backupInfoName = "mdnotes-backup.json"
 const backupMetaEntry = ".mdnotes/meta.json"
 
-// backupInfo 是随备份包一起走的「配置」，供恢复时确认这份包从哪来、能不能用。
+// backupInfo It's with the backup bag.「Configure」，For recovery to confirm where the bag came from and whether it was usable.
 type backupInfo struct {
 	Schema     string `json:"schema"`
 	PluginID   string `json:"pluginId"`
@@ -1124,7 +1124,7 @@ type backupInfo struct {
 	MetaFile   string `json:"metaFile"`
 }
 
-// buildBackupZip 在内存里构造备份包。notes 是要打包的笔记节点，scope 为空表示整库。
+// buildBackupZip Builds a backup package in memory.notes It's about packing the notes.scope is empty for the whole library.
 func buildBackupZip(root string, m Meta, notes []MetaNode, folders int, scope string) []byte {
 	var sb strings.Builder
 	zw := zip.NewWriter(&writerCapture{&sb})
@@ -1155,7 +1155,7 @@ func buildBackupZip(root string, m Meta, notes []MetaNode, folders int, scope st
 		if err != nil {
 			data = []byte("")
 		}
-		// zip 条目名一律用正斜杠（zip 规范），Windows 的 filepath.Join 会给出反斜杠。
+		// zip All entries with a positive slashzip I'm sorry.Windows filepath.Join Will give the back slash.
 		w, e := zw.Create(filepath.ToSlash(n.File))
 		if e != nil {
 			continue
@@ -1179,8 +1179,8 @@ func backupFileName(m Meta, scope string) string {
 		now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute())
 }
 
-// backupNotes 构造备份包。toDisk=false（默认）把字节交回前端，由宿主的原生「另存为」
-// 对话框落盘（用户可自选目录）；toDisk=true 则写进笔记存储目录并回显路径（兜底）。
+// backupNotes Construct a backup package.toDisk=false（Bytes returned to the frontend by the host's original「Save As」
+// dialogue box (user-selected directory);toDisk=true is written into the Note Storage Directory and replays the path.
 func backupNotes(scope string, toDisk bool) (any, *dbxpluginsdk.PluginError) {
 	m := loadMeta()
 	root := notesDir()
@@ -1230,17 +1230,17 @@ func backupNotes(scope string, toDisk bool) (any, *dbxpluginsdk.PluginError) {
 	}, nil
 }
 
-// ---------------- 从备份恢复 ----------------
+// ---------------- Restore from Backup ----------------
 
-// safeRelPath 把 zip 内的条目名规范化为「相对存储目录的安全路径」。
-// 备份包是可以被替换的输入，必须当不可信数据对待：绝对路径、盘符、`..` 一律拒绝。
+// safeRelPath Put zip in which the entry name is standardized to「Secure Path to Relative Storage Directory」。
+// Backup packages can be replaced by input and must be treated as untrustworthy data: absolute path, disc,`..` All rejected.
 func safeRelPath(name string) (string, bool) {
 	n := strings.TrimSpace(strings.ReplaceAll(name, "\\", "/"))
 	if n == "" || strings.HasPrefix(n, "/") {
 		return "", false
 	}
 	if len(n) >= 2 && n[1] == ':' {
-		return "", false // "C:/..." 之类
+		return "", false // "C:/..." Or something.
 	}
 	out := make([]string, 0, 8)
 	for _, p := range strings.Split(n, "/") {
@@ -1258,7 +1258,7 @@ func safeRelPath(name string) (string, bool) {
 	return strings.Join(out, "/"), true
 }
 
-// insideRoot 把相对路径解析为绝对路径，并确认它没有跳出 root。
+// insideRoot Resolve the relative path to the absolute path and confirm that it did not eject root。
 func insideRoot(root, rel string) (string, bool) {
 	abs := filepath.Join(root, filepath.FromSlash(rel))
 	r, err := filepath.Rel(root, abs)
@@ -1271,16 +1271,16 @@ func insideRoot(root, rel string) (string, bool) {
 	return abs, true
 }
 
-// restoreNotes 从备份 zip 恢复笔记与配置。
+// restoreNotes From Backup zip Restore notes and configuration.
 //
-// dryRun=true 只解析并回报包里有什么（供 UI 先让用户确认），不落盘。
+// dryRun=true Just parse and return what's in the bag. UI Let the user confirm) , don't leave the plate.
 //
-// 安全设计：
-//  1. 逐条校验 entry 路径（见 safeRelPath / insideRoot），拒绝跳出存储目录的条目；
-//  2. 限制条目数与解压总量，避免 zip bomb；
-//  3. 必须含 .mdnotes/meta.json，否则不认这个包（避免误喂普通 zip 把库写坏）；
-//  4. 覆盖前自动把当前状态另存一份 pre-restore-*.zip，恢复错了还能退回去；
-//  5. 恢复后清空内容哈希缓存，否则后续保存会因为「缓存说没变」而跳过写盘。
+// Security design:
+//  1. Article by Article Validation entry Path (see safeRelPath / insideRoot），Denys jump-out of entries in the storage directory;
+//  2. Limit the number of entries and the total amount of depressed, avoid zip bomb；
+//  3. Must contain .mdnotes/meta.json，Otherwise, you won't recognize this bag. zip Write down the library;
+//  4. Automatically save a current status before overwrite pre-restore-*.zip，If you are wrong, you can go back.
+//  5. Empty Hashi Cache after recovery, otherwise the subsequent storage will be due to「Cache says it hasn't changed.」And skip the writing disk.
 func restoreNotes(dataBase64 string, dryRun bool) (any, *dbxpluginsdk.PluginError) {
 	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(dataBase64))
 	if err != nil {
@@ -1292,8 +1292,8 @@ func restoreNotes(dataBase64 string, dryRun bool) (any, *dbxpluginsdk.PluginErro
 	}
 
 	const maxEntries = 20000
-	const maxTotal = uint64(256) << 20 // 解压后总量上限 256 MiB
-	const maxFile = uint64(32) << 20   // 单个文件上限 32 MiB
+	const maxTotal = uint64(256) << 20 // Maximum total after depressure 256 MiB
+	const maxFile = uint64(32) << 20   // Single file ceiling 32 MiB
 	if len(zr.File) > maxEntries {
 		return nil, badParams("Backup contains too many entries (%d)", len(zr.File))
 	}
@@ -1334,7 +1334,7 @@ func restoreNotes(dataBase64 string, dryRun bool) (any, *dbxpluginsdk.PluginErro
 				_ = rc.Close()
 				_ = json.Unmarshal(b, &info)
 			}
-			continue // 元信息只用于回显，不落盘
+			continue // meta-information is used only for echoes, and does not leave a disk
 		case backupMetaEntry:
 			rc, e := f.Open()
 			if e != nil {
@@ -1345,7 +1345,7 @@ func restoreNotes(dataBase64 string, dryRun bool) (any, *dbxpluginsdk.PluginErro
 			continue
 		}
 		if !strings.HasSuffix(strings.ToLower(rel), ".md") {
-			continue // 只接受 .md 正文；其余条目忽略，避免把杂七杂八的东西写进库
+			continue // Accept only .md Text; the rest of the entries ignored, avoiding the inclusion of all sorts of things Library
 		}
 		items = append(items, item{zipName: f.Name, rel: rel})
 	}
@@ -1357,8 +1357,8 @@ func restoreNotes(dataBase64 string, dryRun bool) (any, *dbxpluginsdk.PluginErro
 	if err := json.Unmarshal(metaBytes, &bm); err != nil {
 		return nil, badParams("Backup index is corrupt: %v", err)
 	}
-	// 备份可能来自另一个操作系统：索引里的路径分隔符按当前平台归一化，
-	// 否则「Windows 备份 → macOS 恢复」会得到一批文件名里带反斜杠的怪文件。
+	// Backup may come from another operating system: the path separator in the index is unified by the current platform.
+	// Otherwise...「Windows Backup → macOS Restore」You get a bunch of weird files with a backslash in the file name.
 	migrated := false
 	for i := range bm.Nodes {
 		if bm.Nodes[i].File == "" {
@@ -1392,7 +1392,7 @@ func restoreNotes(dataBase64 string, dryRun bool) (any, *dbxpluginsdk.PluginErro
 		}, nil
 	}
 
-	// 覆盖前先把当前状态存一份，恢复错了能退回去。
+	// Save a copy of the current state before overlaying, so that the wrong recovery can be returned.
 	safety := ""
 	if metaExists() {
 		cur := loadMeta()
@@ -1447,7 +1447,7 @@ func restoreNotes(dataBase64 string, dryRun bool) (any, *dbxpluginsdk.PluginErro
 		written++
 	}
 
-	// 索引最后写：正文全就位了再切换索引，中途失败至少不会出现「索引指向不存在的文件」。
+	// Index final: The whole text is in place and the index is switched.「Index to non-existent files」。
 	if err := os.MkdirAll(metaDir(), 0o755); err != nil {
 		return nil, failed(-32006, fmt.Errorf("create meta dir: %w", err))
 	}
@@ -1455,7 +1455,7 @@ func restoreNotes(dataBase64 string, dryRun bool) (any, *dbxpluginsdk.PluginErro
 		return nil, failed(-32006, fmt.Errorf("restore index: %w", err))
 	}
 
-	// 磁盘上的正文刚被外部改写，哈希缓存必须作废，否则后续保存会跳过写盘。
+	// The body of the disk has just been rewrited from the outside, and the Hashi cache must be invalidated, otherwise the subsequent memory will skip the writing disk.
 	hashMu.Lock()
 	contentHashes = map[string]string{}
 	hashMu.Unlock()
@@ -1468,12 +1468,12 @@ func restoreNotes(dataBase64 string, dryRun bool) (any, *dbxpluginsdk.PluginErro
 	}, nil
 }
 
-// writerCapture 把 zip 写入内存（strings.Builder 仅作字节容器）。
+// writerCapture Put zip Write Memorystrings.Builder Byte packagings only.
 type writerCapture struct{ w *strings.Builder }
 
 func (c *writerCapture) Write(p []byte) (int, error) { return c.w.Write(p) }
 
-// ---------------- 待处理上下文（表 -> 新建笔记）----------------
+// ---------------- Context to be addressed (table) -> New Notes)----------------
 
 var pendingMu sync.Mutex
 var pendingContext any
@@ -1492,10 +1492,10 @@ func takePending() any {
 	return v
 }
 
-// ---------------- 文件系统协议（mdnotes://，基于真实文件）----------------
+// ---------------- File System Protocolmdnotes://，Based on authentic documents)----------------
 //
-// 存储目录即虚拟文件系统的根；.mdnotes 内部目录被隐藏。所有写操作同步更新 meta.json，
-// 保证工作台目录树与文件管理器看到的内容一致。
+// Storage directories are the root of the virtual file system;.mdnotes The internal directory is hidden. Synchronize all writing operations meta.json，
+// Ensure that the desk directory tree is consistent with what the file manager sees.
 
 func splitURI(uri string) ([]string, error) {
 	s := uri
@@ -1750,7 +1750,7 @@ func fsRename(params json.RawMessage) (any, error) {
 	srcAbs := filepath.Join(append([]string{root}, srcSegs...)...)
 	dstAbs := filepath.Join(append([]string{root}, dstSegs...)...)
 	srcRel := filepath.Join(srcSegs...)
-	// 目标若是已存在的目录，则把源移入其中
+	// If the target is an existing directory, move the source into it
 	if dstInfo, e := os.Stat(dstAbs); e == nil && dstInfo.IsDir() {
 		dstAbs = filepath.Join(dstAbs, filepath.Base(srcAbs))
 	}
@@ -1775,7 +1775,7 @@ func fsRename(params json.RawMessage) (any, error) {
 	return map[string]any{"success": true, "entry": entryOf(nm, dstRel, kind, 0, "text/markdown")}, nil
 }
 
-// ---------------- meta 与文件系统的双向同步 ----------------
+// ---------------- meta Synchronize in two directions with the filesystem ----------------
 
 func parentIDOf(rel string) *string {
 	d := filepath.Dir(rel)
@@ -1883,7 +1883,7 @@ func newID() string {
 	return fmt.Sprintf("n%d%x", time.Now().UnixNano(), rand.Uint32())
 }
 
-// ---------------- 右键联动：为此表/视图新建笔记 ----------------
+// ---------------- Right-click connection: for this table/View New Note ----------------
 
 func handleNewNoteForTable(params json.RawMessage) (any, *dbxpluginsdk.PluginError) {
 	var p struct {
@@ -1923,7 +1923,7 @@ func handleNewNoteForTable(params json.RawMessage) (any, *dbxpluginsdk.PluginErr
 	}, nil
 }
 
-// ---------------- 原子写 ----------------
+// ---------------- Atom Writing ----------------
 
 var tmpSeq uint64
 
@@ -1931,9 +1931,9 @@ func writeAtomic(path string, b []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	// tmp 名必须唯一：同一个存储目录可能被多个侧车实例同时写（重复建「同一个目录」的连接），
-	// 共用一个固定名（path+".tmp"）会让两个进程互相覆盖对方的半成品，
-	// 甚至把对方的半截内容 rename 成正式文件 —— 索引损坏的后果可能是整库被误删。
+	// tmp The name must be unique: the same memory directory may be written at the same time as the example of multiple sidecars (recreated)「Same directory」It's the connection.
+	// Share a fixed namepath+".tmp"）It will allow both processes to cover each other's semi-finished products.
+	// Even half of each other's content. rename As an official document - The result of the index damage may be that the vault has been wrongly deleted.
 	tmp := fmt.Sprintf("%s.%d.%d.tmp", path, os.Getpid(), atomic.AddUint64(&tmpSeq, 1))
 	if err := os.WriteFile(tmp, b, 0o644); err != nil {
 		return err
@@ -1945,13 +1945,13 @@ func writeAtomic(path string, b []byte) error {
 	return nil
 }
 
-// resolveMetadata 构造启动时向宿主宣告的身份。
+// resolveMetadata Construct the identity declared to the host on startup.
 //
-// 关键：包内 manifest.json 的版本优先于常量。宿主在两者不一致时会拒绝握手
-// （Sidecar identity does not match manifest），而版本号是随每次发版变化的
-// —— 硬编码常量一旦忘记同步，侧车就会被整体丢弃，表现为「UI 里什么都存不了」。
-// 从可执行文件所在目录向上找 manifest.json，找到且 id 匹配就采用它的版本。
-// （同 dbx-plugin-NintyAPI 的 resolveMetadata 做法。）
+// Key: Inside the bag manifest.json , the version takes precedence over the constant. The host refuses to shake hands when the two are incompatible.
+// （Sidecar identity does not match manifest），And the number changes with each release.
+// —— Once the hard-coding constant forgets to synchronize, the sidecar is discarded as a whole.「UI There's nothing in there.」。
+// Look up from the directory where the executable is located manifest.json，Found and id Match it in its version.
+// （Same dbx-plugin-NintyAPI resolveMetadata practice.
 func resolveMetadata() dbxpluginsdk.Metadata {
 	caps := []string{"connections", "notes", "filesystem"}
 	fallback := dbxpluginsdk.Metadata{ID: pluginID, Version: pluginVersion, Capabilities: caps}
@@ -1967,7 +1967,7 @@ func resolveMetadata() dbxpluginsdk.Metadata {
 				ID      string `json:"id"`
 				Version string `json:"version"`
 			}
-			// 只有 id 与本插件一致的 manifest 才有权改写版本，避免误读宿主目录里的别的 manifest。
+			// Only  id Same as this plugin manifest It's the right to rewrite the version and avoid misreading the rest of the host directory. manifest。
 			if json.Unmarshal(data, &m) == nil && m.ID == pluginID && strings.TrimSpace(m.Version) != "" {
 				fallback.Version = strings.TrimSpace(m.Version)
 			}

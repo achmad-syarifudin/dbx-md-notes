@@ -1,9 +1,9 @@
 /*
- * 轻量 Markdown 渲染器（无外部依赖，纯前端）
- * 暴露：window.MDNotes.renderMarkdown(src) -> HTML 字符串
- * 支持：标题、加粗/斜体/删除线、行内代码、代码块（```sql 走 SQL 高亮）、
- *       无序/有序列表（含一层嵌套）、引用、表格、分隔线、链接、段落。
- * 安全：文本先转义 HTML，仅输出受控标签；链接仅允许 http/https/#/mailto。
+ * Light Markdown Renderer (no external dependence, pure frontend)
+ * Exposure:window.MDNotes.renderMarkdown(src) -> HTML String
+ * Support: Title, thicker/Italic/Strikeout line, line code, code block```sql Move! SQL Highlight.
+ *       Orderless/An orderly list (with a nest), references, tables, dividing lines, links, paragraphs.
+ * Security: Text transliteration HTML，Only output controlled labels; links only allowed http/https/#/mailto。
  */
 (function () {
   "use strict";

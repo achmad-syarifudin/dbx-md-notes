@@ -1,4 +1,4 @@
-/* MD 笔记样式：优先使用 DBX 注入的主题 token，缺失时用自带 light/dark 变量兜底 */
+/* MD Note Style: Prefer DBX The theme of the injection token，Use your own belt when missing light/dark Variable Bottom */
 
 :root {
   --bg: #ffffff;
@@ -67,15 +67,15 @@ body {
 
 button, input, textarea, select { font: inherit; color: inherit; }
 
-/* 三栏布局：目录区 | 笔记区 | AI 助手区。宽度由 CSS 变量驱动（拖分隔条时改这两个变量）。
-   data-ai="off" 时 AI 栏与它的分隔条一起消失（列宽归 0，不占位）。 */
+/* Three-column layout: Directory area | Note area | AI Assistant area. Width by CSS Variable driver (replaces the two variables when dragging the partition).
+   data-ai="off" Time AI The bar disappears with its partition. 0，No seats. */
 #app {
   --side-w: 272px;
   --ai-w: 400px;
   display: grid;
   grid-template-columns: var(--side-w) 5px minmax(0, 1fr) 5px var(--ai-w);
-  /* 行高必须锁在容器高度内：默认 auto 会被内容撑高，整页随之溢出视口，
-     而 body 是 overflow:hidden —— 溢出的那部分（往往是底部按钮）就凭空消失了。 */
+  /* Line height must be locked at container height: default auto It'll be high and the whole page will spill over.
+     And... body yes overflow:hidden —— The spill (often the bottom button) disappeared. */
   grid-template-rows: minmax(0, 1fr);
   height: 100%;
   overflow: hidden;
@@ -84,7 +84,7 @@ button, input, textarea, select { font: inherit; color: inherit; }
 #app[data-ai="off"] #gutter-ai,
 #app[data-ai="off"] #ai-panel { display: none; }
 
-/* 拖动分隔条。必须 touch-action:none，否则触控/触控板上的指针事件会被滚动抢走。 */
+/* Drag the partition. touch-action:none，Or touch./The pointer event on the touchboard will be rolled away. */
 .gutter {
   position: relative;
   cursor: col-resize;
@@ -103,7 +103,7 @@ button, input, textarea, select { font: inherit; color: inherit; }
 body.resizing { cursor: col-resize; user-select: none; }
 body.resizing .gutter::after { background: var(--accent); }
 
-/* ---------------- 侧栏 ---------------- */
+/* ---------------- Sidebar ---------------- */
 #sidebar {
   display: flex;
   flex-direction: column;
@@ -132,7 +132,7 @@ body.resizing .gutter::after { background: var(--accent); }
   justify-content: center;
   min-width: 24px;
   height: 24px;
-  padding: 0 7px;              /* 名字是 AI.MD，不能再用固定 24px 宽 */
+  padding: 0 7px;              /* Name? AI.MD，I can't hold it. 24px width */
   border-radius: 6px;
   background: var(--accent);
   color: var(--accent-fg);
@@ -197,8 +197,8 @@ body.resizing .gutter::after { background: var(--accent); }
   border-radius: 6px;
   cursor: default;
   user-select: none;
-  /* 目录树拖拽是指针事件自实现的（见 app.js pdrag*）：
-     touch-action:none 阻止指针被滚动/缩放手势抢走，保证 pointermove 全程可用。 */
+  /* Directory tree drag is a self-fulfilled needle event (see app.js pdrag*）：
+     touch-action:none Stop the pointer rolling/Shrimp away. Promise. pointermove All available. */
   touch-action: none;
   color: var(--fg);
 }
@@ -212,12 +212,12 @@ body.resizing .gutter::after { background: var(--accent); }
 }
 .node.drop-target .node-label { color: var(--accent); }
 
-/* 指针拖拽：拖拽进行中禁止文本选中，显示抓取光标 */
+/* Pointer Drag: Drag to drag to prevent text selection and show grab cursor */
 .dragging-active { user-select: none; -webkit-user-select: none; cursor: grabbing; }
 .drag-ghost {
   position: fixed;
   z-index: 9999;
-  pointer-events: none; /* 关键：否则 elementFromPoint 会命中 ghost 本身 */
+  pointer-events: none; /* Key: Otherwise elementFromPoint It'll hit. ghost In itself */
   max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -289,7 +289,7 @@ body.resizing .gutter::after { background: var(--accent); }
 }
 .foot-stat { letter-spacing: .2px; }
 .foot-num { color: var(--fg-muted); font-weight: 600; }
-/* 存储位置已从侧栏移除（统一在存储状态弹窗显示），故 .foot-loc/.foot-ico/.foot-path 一并删除 */
+/* Storage position removed from the sidebar (consolidated in storage status window) .foot-loc/.foot-ico/.foot-path Remove Together */
 .foot-warn {
   margin-top: 5px;
   padding: 5px 7px;
@@ -301,7 +301,7 @@ body.resizing .gutter::after { background: var(--accent); }
   line-height: 1.45;
 }
 
-/* ---------------- 按钮 ---------------- */
+/* ---------------- button ---------------- */
 button {
   padding: 5px 10px;
   border: 1px solid var(--border);
@@ -332,7 +332,7 @@ button.danger:hover { background: var(--danger-soft); }
   display: inline-flex; align-items: center; justify-content: center;
 }
 
-/* ---------------- 主区 ---------------- */
+/* ---------------- Main ---------------- */
 #main {
   display: flex;
   flex-direction: column;
@@ -364,7 +364,7 @@ button.danger:hover { background: var(--danger-soft); }
 
 .toolbar-right { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .toolbar-right .sep { width: 1px; height: 18px; background: var(--border); margin: 0 2px; }
-/* 「AI 助手」按钮：右栏开着时高亮，一眼能看出状态 */
+/* 「AI Assistant」Button: Highlight when the right column is open and can see the state at first sight */
 .toolbar-right button.on {
   border-color: var(--accent);
   background: var(--accent-soft);
@@ -372,7 +372,7 @@ button.danger:hover { background: var(--danger-soft); }
   font-weight: 600;
 }
 
-/* ---------------- 编辑 / 预览 ---------------- */
+/* ---------------- Edit / Preview ---------------- */
 .panes {
   flex: 1;
   display: grid;
@@ -421,7 +421,7 @@ button.danger:hover { background: var(--danger-soft); }
 .empty-card p { margin: 0 0 14px; font-size: 13px; }
 .empty-card .big { padding: 8px 18px; font-size: 14px; }
 
-/* ---------------- 状态栏 ---------------- */
+/* ---------------- Status Bar ---------------- */
 .statusbar {
   display: flex;
   align-items: center;
@@ -455,7 +455,7 @@ button.danger:hover { background: var(--danger-soft); }
 .store-dot.warn { background: var(--warn); }
 .store-dot.bad { background: var(--danger); }
 
-/* ---------------- 置顶诊断条（页面最上方，始终可见） ---------------- */
+/* ---------------- Top diagnostic bar (top page, always visible) ---------------- */
 .diag-bar {
   flex: 0 0 auto;
   border-bottom: 1px solid var(--border);
@@ -525,7 +525,7 @@ button.danger:hover { background: var(--danger-soft); }
 .view-switch button + button { border-left: 1px solid var(--border); }
 .view-switch button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 
-/* ---------------- 弹窗 ---------------- */
+/* ---------------- Blast the window. ---------------- */
 .modal {
   position: fixed;
   inset: 0;
@@ -551,20 +551,20 @@ button.danger:hover { background: var(--danger-soft); }
 .modal-card h3 { margin: 0 0 12px; font-size: 15px; }
 
 /*
- * 弹框按钮行吸在底部：弹框内容一长（比如 AI 配置有十来项），
- * 主按钮「保存」就会被滚到看不见的地方 —— 用户得先猜着往下滚才知道要按哪里。
- * sticky 之后按钮行始终可见，内容自己在上面滚。
+ * Dialog buttons stay fixed at the bottom: the frame is long (e.g. AI This post is part of our special coverage Syria Protests 2011.
+ * Main button「Save」And you're gonna roll to the invisible -- users have to guess where they're going to press it.
+ * sticky Then the button line is always visible and the content rolls on it.
  */
 .modal-card .modal-actions {
   position: sticky;
-  bottom: -16px;                 /* 抵消 .modal-card 的底部 padding */
-  margin: 16px -20px -16px;      /* 左右铺满 */
+  bottom: -16px;                 /* Offset .modal-card Bottom padding */
+  margin: 16px -20px -16px;      /* Cover left and right */
   padding: 10px 20px 16px;
   background: var(--bg-elev);
   border-top: 1px solid var(--border-soft);
 }
 
-/* 弹框里的「高级选项」折叠块：默认收着，主流程只占必要高度 */
+/* In the frame.「Advanced Options」Collapse block: by default, main process is only necessary height */
 .aip-adv {
   margin-top: 10px;
   padding-top: 8px;
@@ -612,7 +612,7 @@ button.danger:hover { background: var(--danger-soft); }
   white-space: pre-wrap;
 }
 
-/* 存储诊断日志：默认折叠，需要排查时展开 */
+/* Storage diagnostic log: Default folding, which needs to be expanded when sorting */
 .m-diag {
   margin-top: 10px;
   border-top: 1px solid var(--border);
@@ -639,26 +639,26 @@ button.danger:hover { background: var(--danger-soft); }
   margin-top: 16px;
 }
 
-/* ---------------- AI 助手（右侧常驻栏） ----------------
-   与弹窗版的区别：它一直在这儿，可以有历史记录，也不会挡住笔记。
-   结果区域自己滚动，输入区固定在底部（对话式布局）。 */
+/* ---------------- AI Assistant (right-hand resident) ----------------
+   The difference with the dialog: it's been here all along, it can have a history and it won't block notes.
+   As a result, the area is rolling by itself and the input area is fixed at the bottom (dialogue layout). */
 .ai-panel {
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  overflow: hidden;              /* 面板自己裁切，别把内容顶到视口外 */
+  overflow: hidden;              /* The panel is tailoring itself, so don't turn it to the eye. External */
   background: var(--bg-sub);
   border-left: 1px solid var(--border);
 }
 
 /*
- * 上半区（配置 / 分析对象 / 任务 / 对话记录）整块滚动，底栏固定。
+ * Upper half (configuration) / Analysis target / Tasks / dialogue) The whole block is scrolled and the bottom bar is fixed.
  *
- * 之前的写法是「各段自己 flex + 只有 log 可滚动」，结果是：配置区一展开（或窗口变矮），
- * 面板内容就会高过视口，而底部的输入 + 发送按钮是最后一个元素 —— 直接被推到可见区域之外，
- * 表现为「发送按钮不见了」。实测：620px 视口下配置区展开后面板内容高 766px，按钮 bottom=756。
- * 现在把 compose 钉住（flex:none），上面所有内容都进 .aip-scroll 里滚。
+ * The way it was written,「Each of them. flex + Only  log Scrollable」，As a result, the configuration area spreads (or the window gets shorter) and the distribution area is reduced.
+ * The panel content is higher than the view and the bottom input + The sending button is the last element - directly pushed outside the visible area.
+ * As in「The sending button is missing.」。Actual:620px Expand the rear panel of the Portrait Configuration Area High 766px，button bottom=756。
+ * Now put compose Nailflex:none），Everything. .aip-scroll Roll in.
  */
 .aip-scroll {
   flex: 1 1 auto;
@@ -669,7 +669,7 @@ button.danger:hover { background: var(--danger-soft); }
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-.aip-scroll > * { flex: none; }   /* 各段不参与压缩，整块滚 */
+.aip-scroll > * { flex: none; }   /* All sections do not engage in compression. */
 
 .aip-head {
   display: flex;
@@ -693,7 +693,7 @@ button.danger:hover { background: var(--danger-soft); }
 .ai-panel .icon-btn { padding: 2px 6px; font-size: 13px; line-height: 1.4; }
 .ai-panel .icon-btn.on { background: var(--accent-soft); color: var(--accent); }
 
-/* 模式切换：聊天（默认）/ 创作 */
+/* Mode Switch: Chat (default)/ Create */
 .aip-views {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -720,10 +720,10 @@ button.danger:hover { background: var(--danger-soft); }
   font-weight: 600;
 }
 
-/* 只有创作模式才显示的区域（分析对象 + 任务） */
+/* Area shown only in creative mode (analytic object) + ) */
 .aip-create-only { border-bottom: 1px solid var(--border-soft); }
 
-/* 配置弹框里复用的表单件（弹框用 .m-* 那套 + 这里的开关/两列/提示） */
+/* Configure Table Individual Parts Reused in Dialog Boxes (Box Use) .m-* That one. + Here's the switch./Two rows./prompt) */
 .aip-check {
   display: flex;
   align-items: flex-start;
@@ -748,7 +748,7 @@ button.danger:hover { background: var(--danger-soft); }
 .aip-msg[data-kind="warn"] { color: var(--warn); }
 .aip-msg[data-kind="err"] { color: var(--danger); }
 
-/* 分析对象：来源切换 + 对象摘要 + 内容预览 */
+/* Analytic object: Source Switch + Object Summary + Content Preview */
 .aip-target {
   padding: 8px 12px 10px;
   border-bottom: 1px solid var(--border-soft);
@@ -810,7 +810,7 @@ button.danger:hover { background: var(--danger-soft); }
   word-break: break-all;
 }
 
-/* 任务切换 */
+/* Task Switch */
 .aip-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -835,7 +835,7 @@ button.danger:hover { background: var(--danger-soft); }
   font-weight: 600;
 }
 
-/* 对话记录（不再自己滚动，交给 .aip-scroll；但要能把它顶到自然高度） */
+/* Dialogue records (no more rolling on your own) .aip-scroll；But if you can get it up to natural height) */
 .aip-log {
   flex: 1 1 auto;
   min-height: 0;
@@ -908,7 +908,7 @@ button.danger:hover { background: var(--danger-soft); }
   padding: 8px 2px 10px;
 }
 
-/* 底部输入区：钉在栏底，永不参与压缩（否则会被上面的内容挤出可见区域） */
+/* Bottom input area: nailed to the bottom of the column and never involved in compression (or otherwise squeezed out of visible areas from above) */
 .aip-compose {
   flex: none;
   border-top: 1px solid var(--border);
@@ -944,7 +944,7 @@ button.danger:hover { background: var(--danger-soft); }
 }
 .aip-compose-bar button { flex: none; }
 
-/* ---------------- 右键菜单 ---------------- */
+/* ---------------- Right Key Menu ---------------- */
 .ctx-menu {
   position: fixed;
   z-index: 70;
@@ -986,7 +986,7 @@ button.danger:hover { background: var(--danger-soft); }
 .toast[hidden] { display: none; }
 .toast.warn { border-color: var(--warn); color: var(--warn); }
 
-/* ---------------- Markdown 排版 ---------------- */
+/* ---------------- Markdown Layout ---------------- */
 .markdown-body { max-width: 860px; }
 .markdown-body > *:first-child { margin-top: 0; }
 
@@ -1063,7 +1063,7 @@ button.danger:hover { background: var(--danger-soft); }
 
 .markdown-body del { color: var(--fg-subtle); }
 
-/* SQL 高亮配色 */
+/* SQL Highlight colour */
 .tok-kw { color: #cf222e; font-weight: 600; }
 .tok-str { color: #0a7d32; }
 .tok-num { color: #953800; }
@@ -1078,7 +1078,7 @@ button.danger:hover { background: var(--danger-soft); }
 [data-theme="dark"] .tok-id { color: #79c0ff; }
 [data-theme="dark"] .tok-op { color: #d2a8ff; }
 
-/* 滚动条 */
+/* Scrollbar */
 #tree::-webkit-scrollbar, .preview::-webkit-scrollbar, .editor::-webkit-scrollbar, .modal-card::-webkit-scrollbar { width: 10px; height: 10px; }
 #tree::-webkit-scrollbar-thumb, .preview::-webkit-scrollbar-thumb, .editor::-webkit-scrollbar-thumb, .modal-card::-webkit-scrollbar-thumb {
   background: var(--border); border-radius: 6px; border: 2px solid transparent; background-clip: content-box;

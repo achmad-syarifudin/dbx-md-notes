@@ -1,18 +1,18 @@
-// 一次产出**全部平台**的候选包 + `release-candidates.json`。
+// One output**All platforms**Other Organiser + `release-candidates.json`。
 //
-// 背景（官方文档与 CLI 源码实证）：
-//   - `dbx-plugin package` 只按**当前宿主**平台打包；显式传 --target 指向别的平台会被拒绝：
+// Background (official documents and CLI Source empirical:
+//   - `dbx-plugin package` Press Only**Current host**Platform packs; visible transmission --target Pointing to another platform will be rejected:
 //     "Native plugin target 'X' does not match build host 'Y'; run this package command on the target platform"
-//     → 官方的多平台做法是在 CI 上开平台矩阵，各自构建，再合并出 release-candidates.json。
-//   - 本插件的侧车是 **纯 Go、无 cgo**，所以可以直接交叉编译（CGO_ENABLED=0），
-//     在 Windows 上就能产出 darwin-arm64 / linux-x64 的合法包。
-//     ⚠️ 交叉编译的是**字节正确**，不等于**在目标机上验证过** —— 真机冒烟仍需各平台跑一次。
+//     → The official multiplatform approach is CI Open the platform matrix, build each other and merge it. release-candidates.json。
+//   - The side of this plugin is... **Pure Go、none cgo**，So you can cross-compile directly.CGO_ENABLED=0），
+//     Windows It's good enough to produce. darwin-arm64 / linux-x64 The legal package.
+//     ⚠️ The cross-compilation is...**Byte Correct**，Not equal to**Checked on target.** —— The real smoke still needs to run on every platform.
 //
-// 用法：
+// Usage:
 //   node _release.mjs                                  # windows-x64 + darwin-arm64 + linux-x64
-//   node _release.mjs windows-x64 linux-x64            # 只做指定平台
+//   node _release.mjs windows-x64 linux-x64            # Do only specified platforms
 //
-// 产物：
+// Product:
 //   dist/<id>-<version>-<target>.dbxp
 //   dist/<id>-<version>-<target>.artifact.json
 //   dist/release-candidates.json
@@ -27,7 +27,7 @@ const GO = process.env.DBX_GO || "go";
 const GOROOT = process.env.DBX_GOROOT;
 const NODE = process.execPath;
 
-// target → Go 工具链三元组（官方 current_target() 的命名：darwin/linux/windows + arm64/x64）
+// target → Go Triple Group of the Tool Chain (official) current_target() Name of:darwin/linux/windows + arm64/x64）
 const TRIPLES = {
   "windows-x64": ["windows", "amd64"],
   "windows-arm64": ["windows", "arm64"],
@@ -42,7 +42,7 @@ const list = (targets.length ? targets : DEFAULT_TARGETS).slice().sort();
 
 for (const t of list) {
   if (!TRIPLES[t]) {
-    console.error(`[FATAL] 未知 target：${t}。已知：${Object.keys(TRIPLES).join(", ")}`);
+    console.error(`[FATAL] Unknown target：${t}。Known:${Object.keys(TRIPLES).join(", ")}`);
     process.exit(1);
   }
 }
@@ -50,28 +50,28 @@ for (const t of list) {
 const mani = JSON.parse(fs.readFileSync(path.join(ROOT, "manifest.json"), "utf8"));
 const ver = mani.version;
 
-// 用**异步** spawn（见 _testutil.mjs）：本机沙箱里 spawnSync 对任何 exe 都直接 EBUSY。
+// Use**Step** spawn（See _testutil.mjs）：It's in the sandbox. spawnSync Anything. exe All straight. EBUSY。
 async function run(cmd, args, opts = {}) {
   const r = await runProcess(cmd, args, { cwd: ROOT, env: opts.env || process.env, timeoutMs: 600000 });
   if (r.out) process.stdout.write(r.out);
   if (r.err) process.stderr.write(r.err);
   if (r.error) {
-    console.error(`[FATAL] 无法执行命令（${r.error.message}）：${cmd} ${args.join(" ")}`);
+    console.error(`[FATAL] Unable to execute command${r.error.message}）：${cmd} ${args.join(" ")}`);
     process.exit(1);
   }
   if (r.code !== 0) {
-    console.error(`[FATAL] 命令失败（exit ${r.code}${r.signal ? " signal=" + r.signal : ""}）：${cmd} ${args.join(" ")}`);
+    console.error(`[FATAL] Command failed (%1)exit ${r.code}${r.signal ? " signal=" + r.signal : ""}）：${cmd} ${args.join(" ")}`);
     process.exit(1);
   }
   return r.out || "";
 }
 
-console.log(`=== 构建 ${list.length} 个平台：${list.join(", ")} ===\n`);
+console.log(`=== Build ${list.length} Platforms:${list.join(", ")} ===\n`);
 
-// ---- 1) 交叉编译侧车 ----
+// ---- 1) Cross-compile side vehicle ----
 for (const t of list) {
   const [goos, goarch] = TRIPLES[t];
-  // 注意：`go build -C backend` 会先切到 backend/，所以 -o 是相对 backend/ 的。
+  // Note:`go build -C backend` It'll cut first. backend/，So... -o Relative. backend/ Yeah.
   const outArg = `../_xbuild/${BINARY}-${goos}-${goarch}${goos === "windows" ? ".exe" : ""}`;
   const shown = outArg.replace(/^\.\.\//, "");
   process.stdout.write(`[build] ${t.padEnd(13)} GOOS=${goos} GOARCH=${goarch} -> ${shown}\n`);
@@ -80,7 +80,7 @@ for (const t of list) {
   });
 }
 
-// ---- 2) 逐平台打包 ----
+// ---- 2) Packing by Platform ----
 console.log("");
 for (const t of list) {
   const [goos, goarch] = TRIPLES[t];
@@ -88,7 +88,7 @@ for (const t of list) {
   await run(NODE, [path.join(ROOT, "_buildpkg.js"), "--target", t, "--exe", exe]);
 }
 
-// ---- 3) 逐包校验（包结构 / checksums / executable 路径与扩展名） ----
+// ---- 3) Individual verification (package structure) / checksums / executable Path and Extension) ----
 console.log("");
 const pkgOf = (t) => path.join(ROOT, "dist", `${mani.id}-${ver}-${t}.dbxp`);
 for (const t of list) {
@@ -96,15 +96,15 @@ for (const t of list) {
   await run(NODE, [path.join(ROOT, "_verify.mjs"), pkgOf(t)]);
 }
 
-// ---- 4) 汇总 release-candidates.json ----
-// 结构对齐 DBX Store 官方发布流程：plugin 元信息 + artifacts（每个平台的 target/url/sha256/size）。
-// url 用**文件名**（与官方 artifact.json 一致）；候选包本体放在 GitHub Release / CDN 上，
-// 由 dbx-store 的同步 Workflow 读取本文件生成候选 PR。
+// ---- 4) Summary release-candidates.json ----
+// Structure Alignment DBX Store Official publication process:plugin MetaInfo + artifacts（Every platform. target/url/sha256/size）。
+// url Use**Filename**（With the official artifact.json Unanimously; candidate base GitHub Release / CDN Go, go.
+// By dbx-store Synchronise Workflow Read this document to generate candidates PR。
 const artifacts = [];
 for (const t of list) {
   const ap = path.join(ROOT, "dist", `${mani.id}-${ver}-${t}.artifact.json`);
   if (!fs.existsSync(ap)) {
-    console.error(`[FATAL] 缺少 ${path.basename(ap)}`);
+    console.error(`[FATAL] Missing ${path.basename(ap)}`);
     process.exit(1);
   }
   const a = JSON.parse(fs.readFileSync(ap, "utf8"));
@@ -128,5 +128,5 @@ fs.writeFileSync(rcPath, JSON.stringify(payload, null, 2) + "\n", "utf8");
 
 console.log("\n=== release-candidates.json ===");
 console.log(JSON.stringify(payload, null, 2));
-console.log(`\n已写出 ${rcPath}`);
-console.log(`共 ${artifacts.length} 个平台产物：${artifacts.map((a) => a.target + "(" + a.size + "B)").join("  ")}`);
+console.log(`\nSynchronising folder ${rcPath}`);
+console.log(`Total ${artifacts.length} Platform products:${artifacts.map((a) => a.target + "(" + a.size + "B)").join("  ")}`);

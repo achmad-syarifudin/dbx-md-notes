@@ -1,44 +1,44 @@
 /*
- * 存储层 v3（重构版）—— 严格按 DBX 官方插件 SDK 的桥接语义实现
+ * Storage v3（Reconstruct) - Strictly Press DBX Official plugin SDK ♪ The bridge is semantic
  * ==========================================================================
  *
- * 官方 SDK（宿主源码 apps/desktop/src/lib/plugins/pluginHostBridge.ts 里的
- * pluginSdkSource()）定义的 window.dbxPlugin 形状：
+ * Official SDK（Host Source apps/desktop/src/lib/plugins/pluginHostBridge.ts Lee.
+ * pluginSdkSource()）Defined window.dbxPlugin Shape:
  *
  *   window.dbxPlugin = {
- *     ready,                    // Promise<工作台上下文>  ← resolve 的是【纯数据】，不是 API！
- *     get context(),            // 同步读工作台上下文
+ *     ready,                    // Promise<Context on Workboard>  ← resolve It's pure data, no. API！
+ *     get context(),            // Synchronize the context of the workspace
  *     get locale(), get theme(), get capabilities(),
- *     invoke(method, params, { timeoutMs }),   // 调【侧车】（后端）
- *     request(method, params),                 // 调【宿主】（host.getContext / host.saveFile ...）
+ *     invoke(method, params, { timeoutMs }),   // Turn [sidecar] (backend)
+ *     request(method, params),                 // Other Organiserhost.getContext / host.saveFile ...）
  *     notify(...), onContext(fn), onInit(fn), ...
  *   }
  *
- * 三条硬规则（前两条是之前"笔记永远存不了"的根因）：
+ * Three hard rules."The notes will never be saved."The root causes:
  *
- *   1. API 对象永远是 window.dbxPlugin 本身。
- *      绝不能写成 ready.then(api => ...) 然后把 api 当宿主对象用 —— ready 的结果是
- *      上下文数据 { connectionId, database, schema, values }，它没有 invoke/request。
- *      一旦这么写，dbxPlugin.invoke 就是 undefined，侧车握手必然抛错，直接落回内存。
- *      （官方模板的写法是 `dbxPlugin.ready.then((context) => {...})` 然后调用
+ *   1. API The object is always window.dbxPlugin In itself.
+ *      It can't be written. ready.then(api => ...) And then... api Use when host object for... ready As a result,
+ *      Context Data { connectionId, database, schema, values }，It didn't. invoke/request。
+ *      Once written,dbxPlugin.invoke Yeah. undefined，The handshake of the sidecar must be thrown wrong and dropped directly back into the memory.
+ *      （The official template is: `dbxPlugin.ready.then((context) => {...})` Then call.
  *       `window.dbxPlugin.request(...)`。）
  *
- *   2. 侧车 RPC 只能走 `dbxPlugin.invoke(method, params, { timeoutMs })`；
- *      宿主方法走 `dbxPlugin.request(method, params)`。两者不可混用 ——
- *      把 "host.getContext" 交给 invoke() 会被当成侧车方法，侧车没有该 handler。
+ *   2. Sidecar RPC Just go. `dbxPlugin.invoke(method, params, { timeoutMs })`；
+ *      Host's way to go. `dbxPlugin.request(method, params)`。You can't mix them.
+ *      Put "host.getContext" Here. invoke() It'll be used as a sidecar. The sidecar doesn't deserve it. handler。
  *
- *   3. 前端不碰磁盘。插件 UI 跑在 sandboxed iframe（opaque origin）里，
- *      localStorage / IndexedDB / showDirectoryPicker / a.download 全部不可用。
- *      唯一可靠的落盘通道是 `invoke() → Go 侧车 → 真实 .md 文件`。
- *      因此本层【绝不静默退化】：侧车不可用时明确报错（状态栏 + 诊断面板），
- *      内存后端只当会话缓存，且 persistent=false / ok=false，不伪装成已保存。
+ *   3. Do not touch disk at the frontend. Plugin UI Run in sandboxed iframe（opaque origin）Lee,
+ *      localStorage / IndexedDB / showDirectoryPicker / a.download None available.
+ *      The only reliable landing route is `invoke() → Go Sidecar → Real .md Documentation`。
+ *      So the floor [never silently degraded]: clear error reporting when side vehicles are not available (state) Column + A diagnostic panel)
+ *      Memory backend is used only as session cache, and persistent=false / ok=false，Do not disguise as saved.
  *
- * 存储目录从哪来（三层保险，互不依赖）：
- *   a) 宿主连接流程调 connection/connect 时把 storage_dir 交给侧车；
- *   b) 侧车把它持久化在 <DBX_PLUGIN_DATA_DIR>/config.json，重启自己读回；
- *   c) 前端若在工作台上下文里读到 storage_dir，额外 invoke("notes/setDir") 兜底。
- *   前端拿不到 storage_dir 不影响落盘 —— 侧车侧已有一份。【权威来源是侧车】，
- *   前端的 storageDir 只用于显示。
+ * Where does the repository come from (three layers of insurance, not dependent):
+ *   a) Host connection process tune connection/connect Time storage_dir Hand over to the sidecar;
+ *   b) The sidecar keeps it going. <DBX_PLUGIN_DATA_DIR>/config.json，Restart your own reading back.
+ *   c) If the frontend is read in the context of the workstation storage_dir，Extra invoke("notes/setDir") Go to the bottom.
+ *   Can't get frontend storage_dir Without prejudice to the landing — there's already one on the side. I'm not sure.
+ *   Frontend storageDir Only for display.
  */
 (function () {
   "use strict";
@@ -47,20 +47,20 @@
 
   var DATA_KEY = "com.lwai.mdnotes:data:v2";
   var RPC_TIMEOUT = 30000;
-  var READY_TIMEOUT = 8000;   // 等宿主 init 消息
-  var CTX_TIMEOUT = 2500;     // host.getContext 兜底
-  var PING_TIMEOUT = 6000;    // 侧车握手
-  var BRIDGE_TIMEOUT = 8000;  // 等 window.dbxPlugin 注入
-  var BRIDGE_PAYLOAD_LIMIT = 1.9 * 1024 * 1024; // 宿主上限 2 MiB，留出余量
+  var READY_TIMEOUT = 8000;   // Wait for the host. init Message
+  var CTX_TIMEOUT = 2500;     // host.getContext Bottom
+  var PING_TIMEOUT = 6000;    // Sidecar handshake
+  var BRIDGE_TIMEOUT = 8000;  // Wait. window.dbxPlugin Injection
+  var BRIDGE_PAYLOAD_LIMIT = 1.9 * 1024 * 1024; // Host ceiling 2 MiB，Leave some.
   var SAVE_DEBOUNCE = 400;
-  // AI 调用的超时单独放宽：模型常常要几十秒，沿用 30 秒的通用超时会把正常请求掐死。
+  // AI It's a time-out. Models often take dozens of seconds. 30 The second generic timeout will strangle normal requests.
   var AI_TIMEOUT = 180000;
 
-  /* ============ 诊断日志（页面置顶诊断条 + 状态弹窗共用，实时刷新） ============ */
+  /* ============ Diagnosis log (page top diagnostic bar) + Status dialogs shared, updated in real time) ============ */
 
-  var UI_VERSION = "0.8.4";   // 打包脚本会校验它与 manifest.version 一致
+  var UI_VERSION = "0.8.4";   // Pack up the script and verify it with manifest.version Unanimously
   var T0 = (window.performance && window.performance.now) ? window.performance.now() : Date.now();
-  /** 自模块加载起的毫秒数（给每条日志打上相对时间，能看出卡在哪一步） */
+  /** milliseconds loaded from the module (time relative to each log to see where the card is) */
   function since() {
     var t = (window.performance && window.performance.now) ? window.performance.now() : Date.now();
     return t - T0;
@@ -73,7 +73,7 @@
     diag.push({
       at: Date.now(),
       t: since(),
-      ok: (ok === true || ok === false) ? ok : null,   // null = 纯信息
+      ok: (ok === true || ok === false) ? ok : null,   // null = Pure Information
       step: step,
       detail: detail ? String(detail).slice(0, 500) : ""
     });
@@ -101,7 +101,7 @@
     try { return JSON.stringify(e).slice(0, 300); } catch (e2) { return String(e); }
   }
 
-  /** 环境快照：判断「桥接到底在不在」的第一手证据 */
+  /** Environmental snapshot: judgement「Is the bridge there?」First-hand evidence. */
   function envSnapshot() {
     var a = null, keys = [], origin = "?";
     try { a = window.dbxPlugin; } catch (e) { a = null; }
@@ -118,7 +118,7 @@
       + " · readyState=" + document.readyState;
   }
 
-  /** 完整诊断报告（一键复制给开发者看） */
+  /** Full diagnostic report (one key copy to developer) */
   function report() {
     var st = status;
     var L = [];
@@ -148,10 +148,10 @@
     return L.join("\n");
   }
 
-  // 模块加载即落一条，确保「即使 UI 完全没启动」诊断条里也有东西可看。
+  // The module loads one and ensures that「Even UI Not at all.」There's something to see in the diagnosis.
   note("Storage module loaded (waiting for UI to call init)", null, "UI version " + UI_VERSION);
 
-  /* ============================ 状态 ============================ */
+  /* ============================ Status ============================ */
 
   var listeners = [];
   var status = {
@@ -161,17 +161,17 @@
     ok: true,
     lastError: "",
     lastSavedAt: 0,
-    hostAvailable: false,   // window.dbxPlugin 是否存在
+    hostAvailable: false,   // window.dbxPlugin Existence
     sidecarAvailable: false,
-    sidecarError: "",       // 侧车不可用的确切原因
+    sidecarError: "",       // The exact reason why the sidecar was not available.
     connectionId: "",
-    storageDir: "",         // 侧车实际在用的目录（来自侧车回报，权威）
-    dirConfigured: false,   // 侧车是否真用上了用户指定的 storage_dir
-    storagePath: "",        // meta.json 的绝对路径
+    storageDir: "",         // Directory of side vehicles actually in use (from side vehicle returns, authority)
+    dirConfigured: false,   // Did the sidecar actually use the user's designation? storage_dir
+    storagePath: "",        // meta.json absolute path
     fsSupported: false,
     folderName: "",
-    backupOnly: false,      // true = 仅会话内缓存，未真正落盘
-    payloadBytes: 0         // 最近一次 save 的负载大小
+    backupOnly: false,      // true = Session Cache Only, No Real Cache
+    payloadBytes: 0         // Last save Load Size
   };
 
   function emit() {
@@ -186,7 +186,7 @@
     emit();
   }
 
-  /* ============================ 小工具 ============================ */
+  /* ============================ Small tool ============================ */
 
   function delay(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
@@ -202,7 +202,7 @@
     );
   }
 
-  /** 把 promise 收成 { ok, value | error }，避免到处 try/catch */
+  /** Put promise Harvest { ok, value | error }，Avoiding everywhere. try/catch */
   function settle(promise) {
     return Promise.resolve(promise).then(
       function (v) { return { ok: true, value: v }; },
@@ -214,12 +214,12 @@
     return (typeof v === "string" && v.trim()) ? v.trim() : "";
   }
 
-  /* ====================== 宿主桥接获取 ====================== */
+  /* ====================== Host Bridge Access ====================== */
 
-  var api = null;          // window.dbxPlugin（API 对象）
-  var apiReady = false;    // 是否已收到宿主 init
+  var api = null;          // window.dbxPlugin（API Object)
+  var apiReady = false;    // Have you received the host? init
 
-  /** 等 window.dbxPlugin 注入（SDK 脚本在 <head>，正常是同步就绪；这里只做保险） */
+  /** Wait. window.dbxPlugin InjectionSDK Script in <head>，It's normal to synchronize; it's only for insurance. */
   function waitBridge(ms) {
     if (api) { return Promise.resolve(api); }
     var deadline = Date.now() + ms;
@@ -233,7 +233,7 @@
     })();
   }
 
-  /** 等 ready —— 只等它 resolve，绝不使用它的值（值是上下文数据，不是 API） */
+  /** Wait. ready —— Just wait for it. resolve，Never use its value (value is context data, no) API） */
   function waitReady(a) {
     if (apiReady) { return Promise.resolve(true); }
     var ready = (a && a.ready && typeof a.ready.then === "function") ? a.ready : Promise.resolve();
@@ -244,7 +244,7 @@
     });
   }
 
-  /** 读工作台上下文：同步 context 优先，缺失时用宿主 request("host.getContext") 兜底 */
+  /** Read the context on the desktop: Sync context Priority, host if missing request("host.getContext") Bottom */
   function readContext(a) {
     var sync = null;
     try { sync = a && a.context; } catch (e) { sync = null; }
@@ -271,7 +271,7 @@
     return "Fields [" + keys.slice(0, 8).join(", ") + (keys.length > 8 ? ", …" : "") + "]";
   }
 
-  /** 从上下文里尽力取 connectionId / storage_dir（取不到也不影响落盘，见文件头说明） */
+  /** Try to get it from the context. connectionId / storage_dir（It doesn't matter if you don't get it, see the header) */
   var DIR_KEYS = ["storage_dir", "storageDir", "storage_path", "storagePath", "notes_dir", "notesDir"];
   function extractPath(obj, keys, depth) {
     if (!obj || typeof obj !== "object" || depth > 4) { return ""; }
@@ -309,7 +309,7 @@
     return { connectionId: connectionId, storageDir: storageDir };
   }
 
-  /* ====================== 侧车通道（唯一真实持久化） ====================== */
+  /* ====================== Side lanes (single real permanence) ====================== */
 
   var client = null;  // { api, connectionId, storageDir }
 
@@ -332,8 +332,8 @@
   }
 
   /**
-   * 调侧车。宿主把 invoke() 直接映射到 backend.invoke，并把侧车的 JSON-RPC result
-   * 原样 resolve 回来；侧车报错则宿主 reject。这里只做一层兼容解包。
+   * Turn the car. The host's. invoke() Direct Map to backend.invoke，And put the sidecar. JSON-RPC result
+   * As it is. resolve Come back; the sidecar is wrong and the host reject。There's only one compatible package.
    */
   function rpc(method, params, timeoutMs) {
     var started = since();
@@ -356,7 +356,7 @@
     });
   }
 
-  /* ====================== 会话内存后端（仅缓存，不伪装持久） ====================== */
+  /* ====================== Session memory backend (cache only, not disguise for long) ====================== */
 
   function memoryBackend() {
     var mem = null;
@@ -369,7 +369,7 @@
     };
   }
 
-  /* ============ 本地目录后端（仅限非沙箱环境打开 index.html 时；DBX 内不可用） ============ */
+  /* ============ Local directory backend (non-sandbox environment only open) index.html time;DBX Not available internally) ============ */
 
   function isSandboxed() {
     try { return !window.origin || String(window.origin) === "null"; } catch (e) { return true; }
@@ -404,7 +404,7 @@
     };
   }
 
-  /* ============================ 当前后端 ============================ */
+  /* ============================ Current Backend ============================ */
 
   var current = null;
   var flushTimer = null;
@@ -442,7 +442,7 @@
     });
   }
 
-  /* ============================ 初始化 ============================ */
+  /* ============================ Initialize ============================ */
 
   function failHard(reason) {
     setStatus({
@@ -489,7 +489,7 @@
 
         client = { api: a, connectionId: info.connectionId, storageDir: info.storageDir };
 
-        // 上下文更新（换连接）时保持同步，不重建 iframe 也能跟上
+        // Synchronize when context updates (reconnection), not reconstruct iframe I can keep up.
         if (typeof a.onContext === "function") {
           try {
             a.onContext(function (next) {
@@ -502,10 +502,10 @@
               }
               emit();
             });
-          } catch (e) { /* 老宿主无 onContext，忽略 */ }
+          } catch (e) { /* No old host. onContext，Ignore */ }
         }
 
-        // —— 侧车握手：这才是真正的可用性判据 ——
+        // —— The sidecar shakes hands: This is the real law of availability --
         return settle(withTimeout(rpc("notes/ping", {}, PING_TIMEOUT), PING_TIMEOUT + 500, "Sidecar handshake notes/ping"))
           .then(function (r) {
             if (!r.ok) {
@@ -529,7 +529,7 @@
               dirConfigured: pl.configured === true
             });
 
-            // 若上下文里读到了 storage_dir，额外告知侧车做兜底（侧车自己也有 config.json）
+            // If the context reads storage_dir，Tell the sidecar to go under. config.json）
             if (info.storageDir) {
               settle(rpc("notes/setDir", { dir: info.storageDir }, PING_TIMEOUT)).then(function (s) {
                 note("Sync storage directory to sidecar notes/setDir", s.ok,
@@ -572,7 +572,7 @@
     });
   }
 
-  /* ====================== 侧车后端实现 ====================== */
+  /* ====================== Side end achieved ====================== */
 
   function jsonBytes(v) {
     try { return new Blob([JSON.stringify(v)]).size; }
@@ -624,20 +624,20 @@
     };
   }
 
-  /* ================== 宿主「另存为」：让用户自己选目录 ==================
-   * 为什么必须走宿主而不是 a.download：插件 UI 跑在 opaque origin 的 sandbox iframe 里，
-   * blob 导航/下载会被宿主无声取消（WKWebView 直接 cancel），前端点不动任何下载。
-   * 宿主提供的 host.saveFile 由它自己弹【原生保存对话框】并写盘 —— 用户可选目录和文件名。
+  /* ================== Host「Save As」：Let the user choose his directory ==================
+   * Why do you have to walk the host? a.download：Plugin UI Run in opaque origin sandbox iframe Lee,
+   * blob Navigation/Downloads will be cancelled by host silently (WKWebView Direct cancel），The frontend does not move any downloads.
+   * Provided by the host host.saveFile The user-optional directories and filenames are written by it.
    *
-   * 传输方式（宿主源码 apps/desktop/src/lib/plugins/pluginHostBridge.ts · host.saveFile）：
-   *   - 传 Uint8Array / ArrayBuffer → postMessage 以 transfer 零拷贝送出，上限 512 MiB；
-   *   - 传 base64 字符串          → 作为请求参数走 JSON，受 2 MiB 参数上限约束（约合 1.5 MB 文件）。
-   * 所以一律传 ArrayBuffer，且必须是【长度精确】的 buffer —— SDK 里
-   * `data instanceof Uint8Array ? data.buffer : …` 会把整个 underlying buffer 送走，
-   * 若递过去的是大 buffer 上的一个视图，落盘内容会多出一截垃圾。
+   * Transfer mode (host source) apps/desktop/src/lib/plugins/pluginHostBridge.ts · host.saveFile）：
+   *   - Pass Uint8Array / ArrayBuffer → postMessage Here. transfer Zero copies sent, maximum 512 MiB；
+   *   - Pass base64 String          → Walk as Request Parameter JSON，2 MiB Parameter upper limit bound (consent) 1.5 MB Documentation.
+   * That's why it's all over. ArrayBuffer，And must be precise in length. buffer —— SDK Lee.
+   * `data instanceof Uint8Array ? data.buffer : …` ♪ Will take the whole ♪ underlying buffer Send it away.
+   * If it's big buffer The view above, the drop-off content will add another piece of garbage.
    */
 
-  /** 宿主对 request 参数有 2 MiB 上限（enforcePayloadLimit）→ 上行文件（如恢复备份）要守住这个量级 */
+  /** The host. request Parameters have 2 MiB Upper limitenforcePayloadLimit）→ The top file (e.g., restoration of backup) should hold this level. */
   var MAX_UPSTREAM_BYTES = 1500 * 1000;
 
   function base64ToBytes(b64) {
@@ -647,7 +647,7 @@
     return out;
   }
 
-  /** 得到「长度精确」的 ArrayBuffer（见上方注释：视图会被整个 buffer 送走） */
+  /** Got it.「Length Precision」ArrayBuffer（See comment above: View will be complete buffer Send them away) */
   function toExactBuffer(v) {
     if (v instanceof ArrayBuffer) { return v; }
     var u8;
@@ -664,7 +664,7 @@
     return !!(api && typeof api.saveFile === "function");
   }
 
-  /** 弹宿主原生「另存为」，把字节写到用户选的目录。返回 {ok, canceled, path, error} */
+  /** It's the homeowner.「Save As」，Writes bytes to the directory selected by the user. Back {ok, canceled, path, error} */
   function hostSaveFile(fileName, contentType, bytes) {
     if (!hasHostSave()) {
       note("Host saveFile", false, "Current host lacks saveFile capability; cannot open save dialog");
@@ -683,7 +683,7 @@
     }
     var opts = { fileName: fileName, contentType: contentType };
     return Promise.resolve(api.saveFile(opts, buf)).then(function (res) {
-      // 宿主文档：用户取消时 resolve null
+      // Host document: When user cancels resolve null
       if (res === null || res === undefined) {
         note("Host saveFile", null, "User canceled save: " + fileName);
         return { ok: false, canceled: true, path: "", error: "Canceled" };
@@ -697,7 +697,7 @@
     });
   }
 
-  /* ============================ 对外 API ============================ */
+  /* ============================ External API ============================ */
 
   var Store = {
     DATA_KEY: DATA_KEY,
@@ -708,13 +708,13 @@
       return function () { listeners = listeners.filter(function (x) { return x !== fn; }); };
     },
 
-    /** 订阅诊断日志变化（每落一条就回调一次），供页面置顶诊断条实时刷新 */
+    /** Subscription to diagnostic log changes (one call back for every one down) for real-time updating of page top diagnostic bars */
     onDiag: onDiag,
 
-    /** 由 UI 层往同一条诊断日志里补记（前端各启动阶段） */
+    /** By UI Layer to fill in the same diagnostic log (first-end start-up phases) */
     log: function (step, ok, detail) { note(step, ok, detail); },
 
-    /** 完整诊断报告文本（一键复制） */
+    /** Full diagnostic report text (one key copy) */
     report: report,
 
     env: envSnapshot,
@@ -728,10 +728,10 @@
       return copy;
     },
 
-    /** 初始化，返回 { data, pending, firstRun, connectionId, storageDir, path, backupOnly } */
+    /** Initialize, return { data, pending, firstRun, connectionId, storageDir, path, backupOnly } */
     init: init,
 
-    /** 上下文变化时重新绑定（不重建 iframe 的宿主会推 context，一般不需要手动调） */
+    /** Rebound when context changes (not reconstructed) iframe The host will push context，I usually don't need to do it manually. */
     rebind: function () {
       return waitBridge(BRIDGE_TIMEOUT).then(function (a) {
         if (!a) { return Store.status(); }
@@ -747,7 +747,7 @@
       }).catch(function () { return Store.status(); });
     },
 
-    /** 手动指定笔记存储目录（走侧车 notes/setDir） */
+    /** Manually specify notes memory directory (sideside) Car notes/setDir） */
     setDir: function (dir) {
       if (!nonEmptyStr(dir)) { return Promise.resolve({ ok: false, error: "Directory is empty" }); }
       return settle(rpc("notes/setDir", { dir: dir }, PING_TIMEOUT)).then(function (r) {
@@ -767,7 +767,7 @@
       });
     },
 
-    /** 目录选择器（仅非沙箱环境；DBX 内不会出现该按钮） */
+    /** Directory Selector (non-sand box environment only);DBX The button does not appear inside) */
     pickDirectory: function () {
       if (!fsSupported()) {
         return Promise.resolve({
@@ -793,7 +793,7 @@
     fsSupported: fsSupported,
     folderName: function () { return fsState.name; },
 
-    /** 用当前后端重新读一次（侧车目录变化后同步 UI） */
+    /** Read again with the current backend (sync after sidecar directory changes) UI） */
     reload: function () {
       return readCurrent().then(function (r) {
         r.connectionId = status.connectionId;
@@ -803,31 +803,31 @@
       });
     },
 
-    /** 直接调侧车 RPC（导出/备份走后端落盘），resolve 侧车 result */
+    /** Direct sidecar RPC（Export/Back-up back-end on-board,resolve Sidecar result */
     invoke: function (method, params) {
       return rpc(method, params, RPC_TIMEOUT);
     },
 
-    /* ---------------- AI（走侧车；密钥不下发前端，前端也永远拿不到） ----------------
+    /* ---------------- AI（Side-by-sidecar; front-end without the key or front-end) ----------------
      *
-     * 设计取舍：不再依赖宿主的 host.ai（内置 AI 面板）。
-     *   - 那个接口只「打开对话」，不返回模型回复、不暴露模型配置，做不了「结果写回笔记」；
-     *   - 它需要 host.ai 权限，而权限是静态的 —— 旧宿主遇到未知权限会在安装阶段直接拒绝，
-     *     等于为了一个用不上的入口把所有 <0.6.20 的用户挡在门外。
-     * 现在只保留一条路：配置第三方模型，由侧车持有密钥并直连。
+     * Design trade-offs: no longer dependent on host host.ai（Internal AI Panel.
+     *   - That interface just...「Open Dialogue」，I can't do it without returning to the model.「And then I wrote back.」；
+     *   - It needs host.ai Permissions, which are static - the old host will be directly denied at the installation stage when it encounters unknown privileges.
+     *     It's all for an unserviceable entrance. <0.6.20 Users are blocking the door.
+     * There is only one path left: a third-party model with a key and a direct connection from the sidecar.
      */
 
-    /** 侧车当前的 AI 配置与状态（不含密钥，只有一个 hasKey 布尔） */
+    /** The sidecar is now. AI Configure and Status (without key, only one) hasKey Boer) */
     aiConfig: function () {
       return rpc("ai/config", {}, RPC_TIMEOUT).catch(function () { return null; });
     },
 
     /**
-     * 更新 AI 配置。cfg 可含：
+     * Update AI Configure.cfg Including:
      *   enabled / provider / baseUrl / model / apiKey / systemPrompt / timeoutSecs / maxChars
-     *   rememberKey（true = 允许把密钥写进本机插件数据目录）
-     *   clearKey（true = 清掉本机保存的密钥）
-     * persist=false 时只改内存（供「测试连接」用，不落盘）。
+     *   rememberKey（true = Allows the key to be written into the Plugin Data Directory)
+     *   clearKey（true = Clear the key saved by this machine)
+     * persist=false Only memory changes「Test connection」Use, don't drop the wheel.
      */
     aiSetConfig: function (cfg, persist) {
       var payload = { persist: persist !== false };
@@ -840,27 +840,27 @@
     },
 
     /**
-     * 用一组参数（留空则用当前生效配置）发一次最小请求。
-     * **不会改动生效配置** —— 测坏了不会把用户原本能用的配置搞坏。
+     * Sends a minimum request with a set of parameters (sustained with current effective configuration).
+     * **No changes to effective configuration** —— It doesn't break the user's original configuration.
      */
     aiTest: function (cfg) {
       return rpc("ai/test", cfg || {}, AI_TIMEOUT);
     },
 
-    /** 清掉本机（面板）保存的配置，回到「以连接配置为准」 */
+    /** Clear the configuration of this machine. Go back.「Based on connection configuration」 */
     aiResetConfig: function () {
       return rpc("ai/resetConfig", {}, RPC_TIMEOUT);
     },
 
-    /** 让 AI 处理一段文本。task ∈ analyze|polish|continue|ask */
+    /** Jean. AI Processing a paragraph text.task ∈ analyze|polish|continue|ask */
     aiChat: function (task, text, instruction) {
       return rpc("ai/chat", { task: task, text: text, instruction: instruction || "" }, AI_TIMEOUT);
     },
 
-    /** AI 调用的超时（毫秒），供 UI 显示进度预期 */
+    /** AI Call timeout (ms) for UI Show progress expectations */
     AI_TIMEOUT: AI_TIMEOUT,
 
-    /* ---------------- UI 偏好（面板宽度等，存在插件数据目录，不进笔记目录） ---------------- */
+    /* ---------------- UI Preferences (panel width, etc., Plugin data directories exist, not note directories) ---------------- */
 
     getPrefs: function () {
       return rpc("ui/getPrefs", {}, RPC_TIMEOUT)
@@ -872,16 +872,16 @@
       return rpc("ui/setPrefs", { prefs: prefs || {} }, RPC_TIMEOUT).catch(function () { return null; });
     },
 
-    /** 宿主是否提供「另存为」对话框（决定导出/备份能否让用户自选目录） */
+    /** Hosts offer「Save As」dialogue box (decision export)/Can Backup Make Users Choose Directory) */
     hasHostSave: hasHostSave,
 
-    /** 弹宿主原生「另存为」，把字节写到用户选的目录 */
+    /** It's the homeowner.「Save As」，Write byte to the user selected directory */
     saveFile: hostSaveFile,
 
-    /** 上行（前端 → 侧车）单次文件大小上限，见 MAX_UPSTREAM_BYTES 注释 */
+    /** Upline (frontend) → Single file size limit, see MAX_UPSTREAM_BYTES Comment */
     MAX_UPSTREAM_BYTES: MAX_UPSTREAM_BYTES,
 
-    /** 写入。debounce=true 时合并短时间内的多次写入 */
+    /** Write.debounce=true Merge multiple times within a short period of time */
     save: function (data, debounce) {
       if (debounce) {
         pendingData = data;
@@ -893,8 +893,8 @@
     },
 
     writeNow: function (data) {
-      // 直接写盘必须取消挂起的防抖写：否则更早排队的旧快照会在 400ms 后落盘，
-      // 把这次（更新的）写入覆盖掉。恢复备份时曾因此把恢复结果整片盖回旧状态。
+      // Direct writing must cancel the hang-up tremors: otherwise the earlier queues of the old fast notes are in 400ms Backwards,
+      // Write this (updated) overwrite. When the backup was restored, the entire restoration result was therefore covered back to its old state.
       if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
       pendingData = null;
       if (!current) { current = memoryBackend(); }
@@ -910,7 +910,7 @@
         });
         return true;
       }).catch(function (err) {
-        // 侧车写失败：尝试重连一次再重试（宿主可能重启过侧车）
+        // Sidecar failure: trying to reconnect and try again.
         if (target.name === "sidecar") {
           return settle(withTimeout(rpc("notes/ping", {}, PING_TIMEOUT), PING_TIMEOUT + 500, "Reconnect sidecar"))
             .then(function (r) {
@@ -952,7 +952,7 @@
       });
     },
 
-    /** 读本地文件为 base64（恢复备份用：zip 是二进制，不能按文本读） */
+    /** Read Local File As base64（Restore backup:zip It's binary, not textable. */
     readFileAsBase64: function (file) {
       return new Promise(function (resolve, reject) {
         var r = new FileReader();
@@ -969,14 +969,14 @@
       });
     },
 
-    /** 诊断文本（存储状态弹窗用） */
+    /** Diagnosis text (storage of dialogs) */
     diagLines: diagLines
   };
 
-  /* ====================== 看门狗：拿不到结果也要留下证据 ======================
-   * 存在的意义：本次事故（bindEvents 崩在缺失按钮上 → boot 中断 → init() 从未被调用）
-   * 在前端表现为「状态一直是 unknown」，但没有任何异常提示。看门狗把这种「静默卡死」
-   * 变成诊断日志里的一条 FAIL，直接指出是 UI 层没调 init，而不是存储层的问题。
+  /* ====================== Watchdog: Leave evidence if you can't get results. ======================
+   * Meaning of existence: the accidentbindEvents Dropped on the missing button → boot Interrupt → init() Never called)
+   * At the frontend「State has always been unknown」，But there was no unusual hint. Watchdogs take this.「Zimmerka's dead.」
+   * Turned into a diagnostic log. FAIL，Just say yes. UI It's not working. init，Not the storage problem.
    */
   var WATCHDOG_MARKS = [4000, 10000, 20000];
   WATCHDOG_MARKS.forEach(function (ms) {
@@ -994,7 +994,7 @@
     }, ms);
   });
 
-  // 页面隐藏/卸载前把最后一次编辑写出去
+  // Page Hide/Write out the last editor before unmounting
   window.addEventListener("pagehide", function () { Store.flush(); });
   window.addEventListener("beforeunload", function () { Store.flush(); });
   document.addEventListener("visibilitychange", function () {
